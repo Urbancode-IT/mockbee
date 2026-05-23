@@ -362,9 +362,17 @@
     <!-- Check Subscription Script -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
             let isSubscribed = localStorage.getItem('mockbee_subscribed') === 'true';
             let subscribedPlan = localStorage.getItem('mockbee_subscribed_plan');
             let savedBilling = localStorage.getItem('mockbee_sub_billing');
+
+            if (isStudent) {
+                isSubscribed = true;
+                subscribedPlan = 'student_access';
+                localStorage.setItem('mockbee_subscribed', 'true');
+                localStorage.setItem('mockbee_subscribed_plan', 'student_access');
+            }
             
             // Robust check: If session keys are missing but registry says they are subbed, restore them
             if (!isSubscribed || !subscribedPlan) {
@@ -406,7 +414,7 @@
             const startDateStr = localStorage.getItem('mockbee_sub_start_date');
             const endDateStr = localStorage.getItem('mockbee_sub_end_date');
 
-            if (endDateStr) {
+            if (!isStudent && endDateStr) {
                 const endDate = new Date(endDateStr);
                 if (new Date() > endDate) {
                     actualIsSubscribed = false;
@@ -432,7 +440,23 @@
             }
 
             // Only apply subscribed styling if user is ACTUALLY subscribed
-            if (actualIsSubscribed) {
+            if (isStudent) {
+                const datesBox = document.getElementById('subscription-dates');
+                if (datesBox) {
+                    datesBox.textContent = 'Student Access: Enabled by admin';
+                    datesBox.style.display = 'inline-block';
+                }
+                [standardBtn, proBtn].forEach(btn => {
+                    if (btn) {
+                        btn.textContent = 'Included';
+                        btn.style.pointerEvents = 'none';
+                        btn.style.background = '#27AE60';
+                        btn.style.borderColor = '#27AE60';
+                        btn.style.color = '#fff';
+                    }
+                });
+                if (starterBtn) starterBtn.textContent = 'Student Account';
+            } else if (actualIsSubscribed) {
                 // Fallback for dates if they are missing from localStorage
                 const displayStartDate = startDateStr || new Date().toISOString();
                 const displayEndDate = endDateStr || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -518,10 +542,10 @@
                 const proBtnEl = document.getElementById('pro-btn');
                 const billing = currentBilling;
                 // Only update if button is still clickable (not "Active Plan" or "Unavailable")
-                if (standardBtnEl && standardBtnEl.textContent.trim() !== 'Active Plan' && standardBtnEl.textContent.trim() !== 'Unavailable') {
+                if (standardBtnEl && !['Active Plan', 'Unavailable', 'Included'].includes(standardBtnEl.textContent.trim())) {
                     standardBtnEl.onclick = function () { location.href = `payment.html?plan=standard&billing=${billing}`; };
                 }
-                if (proBtnEl && proBtnEl.textContent.trim() !== 'Active Plan') {
+                if (proBtnEl && !['Active Plan', 'Included'].includes(proBtnEl.textContent.trim())) {
                     proBtnEl.onclick = function () { location.href = `payment.html?plan=elite&billing=${billing}`; };
                 }
             }

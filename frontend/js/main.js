@@ -78,6 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
               localStorage.removeItem('mockbee_user_name');
               localStorage.removeItem('mockbee_user_email');
+              localStorage.removeItem('mockbee_role');
+              localStorage.removeItem('mockbee_is_student');
+              localStorage.removeItem('mockbee_admin_token');
               localStorage.removeItem('mockbee_subscribed');
               localStorage.removeItem('mockbee_interviews');
               localStorage.removeItem('mockbee_activities');

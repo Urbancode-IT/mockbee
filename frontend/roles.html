@@ -288,7 +288,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Check for subscription status
-            const isSubscribed = localStorage.getItem('mockbee_subscribed') === 'true';
+            const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+            const isSubscribed = localStorage.getItem('mockbee_subscribed') === 'true' || isStudent;
             const roleCards = document.querySelectorAll('.role-card');
 
             // List of roles that are FREE for everyone

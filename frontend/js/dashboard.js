@@ -66,6 +66,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const userPlanBadge = document.querySelector('.user-plan-mini');
 
     const updateSubUI = (isSubbed) => {
+        const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+        if (isStudent) {
+            subBtn?.classList.add('is-subscribed');
+            if (subText) subText.textContent = 'Student Access';
+            if (userPlanBadge) {
+                userPlanBadge.textContent = 'STUDENT';
+                userPlanBadge.style.backgroundColor = 'transparent';
+                userPlanBadge.style.color = '#27AE60';
+                userPlanBadge.style.fontWeight = '800';
+            }
+            if (subBtn) {
+                subBtn.style.setProperty('background-color', '#27AE60', 'important');
+                subBtn.style.setProperty('border-color', '#27AE60', 'important');
+                subBtn.style.setProperty('color', '#FFF', 'important');
+            }
+            return;
+        }
+
         let subscribedPlan = localStorage.getItem('mockbee_subscribed_plan');
         
         // Robust check: If session keys are missing but registry says they are subbed, restore them
@@ -141,6 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSubUI(initialSubCheck);
 
     subBtn?.addEventListener('click', () => {
+        const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+        if (isStudent) {
+            alert('Your student account has access enabled by the admin.');
+            return;
+        }
         const isCurrentlySubbed = localStorage.getItem('mockbee_subscribed') === 'true';
         if (isCurrentlySubbed) {
             alert('You are already a Pro Member! Enjoy all premium benefits.');
@@ -286,6 +309,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 7.1 Subscription Expiry Check
     function checkSubscriptionExpiry() {
+        const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+        if (isStudent) return;
         const isSubbed = localStorage.getItem('mockbee_subscribed') === 'true';
         if (!isSubbed) return;
 
@@ -586,6 +611,9 @@ document.querySelector('.btn-logout')?.addEventListener('click', () => {
             // Clear session keys
             localStorage.removeItem('mockbee_user_name');
             localStorage.removeItem('mockbee_user_email');
+            localStorage.removeItem('mockbee_role');
+            localStorage.removeItem('mockbee_is_student');
+            localStorage.removeItem('mockbee_admin_token');
             localStorage.removeItem('mockbee_subscribed');
             localStorage.removeItem('mockbee_subscribed_plan');
             localStorage.removeItem('mockbee_sub_start_date');

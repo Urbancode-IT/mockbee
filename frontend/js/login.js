@@ -85,54 +85,53 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!provider || provider === '') return;
 
-            const mockName = `${provider} User`;
-            const mockEmail = `${provider.toLowerCase()}-auth@mockbee.com`;
-            const mockPassword = `oauth_token_${provider.toLowerCase()}`;
+            let oauthEmail = prompt(`Enter the email for your ${provider} account:`) || '';
+            oauthEmail = oauthEmail.trim().toLowerCase();
+            if (!oauthEmail || !oauthEmail.includes('@')) {
+                alert('A valid email is required to continue.');
+                return;
+            }
+            const defaultName = oauthEmail.split('@')[0] || `${provider} User`;
+            const oauthName = prompt(`Enter your ${provider} account name:`, defaultName) || defaultName;
 
             // Try to login first
-            fetch(`${API_BASE}/api/login`, {
+            fetch(`${API_BASE}/api/oauth-login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: mockEmail, password: mockPassword })
+                body: JSON.stringify({ provider, email: oauthEmail, name: oauthName })
             })
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
                     // Login successful!
-                    finalizeOAuth(data.name, data.email);
+                    finalizeOAuth(data.name, data.email, data.role, data.is_student);
                 } else {
                     // Login failed, try to register the mock account
-                    fetch(`${API_BASE}/api/signup`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: mockName, email: mockEmail, password: mockPassword })
-                    })
-                    .then(res => res.json())
-                    .then(regData => {
-                        if (regData.status === 'success') {
-                            finalizeOAuth(mockName, mockEmail);
-                        } else {
-                            alert(`Failed to simulate ${provider} login.`);
-                        }
-                    });
+                    alert(data.detail || `Failed to continue with ${provider}.`);
                 }
             })
             .catch(err => {
                 // Backend unreachable — simulate OAuth locally so user isn't blocked
-                finalizeOAuth(mockName, mockEmail);
+                finalizeOAuth(oauthName, oauthEmail, 'PUBLIC', false);
             });
         });
     });
 
-    function finalizeOAuth(name, email) {
+    function finalizeOAuth(name, email, role = 'PUBLIC', isStudent = false) {
         localStorage.setItem('mockbee_user_name', name);
         localStorage.setItem('mockbee_user_email', email);
+        localStorage.setItem('mockbee_role', role || 'PUBLIC');
+        localStorage.setItem('mockbee_is_student', isStudent ? 'true' : 'false');
+        localStorage.removeItem('mockbee_admin_token');
         
         // Restore subscription status from account registry if available
         const accounts = JSON.parse(localStorage.getItem('mockbee_accounts') || '{}');
         const userAcc = accounts[email];
 
-        if (userAcc && userAcc.subscribed) {
+        if (isStudent) {
+            localStorage.setItem('mockbee_subscribed', 'true');
+            localStorage.setItem('mockbee_subscribed_plan', 'student_access');
+        } else if (userAcc && userAcc.subscribed) {
             localStorage.setItem('mockbee_subscribed', 'true');
             localStorage.setItem('mockbee_subscribed_plan', userAcc.subscribedPlan || 'standard');
             if (userAcc.allPlans) localStorage.setItem('mockbee_all_plans', JSON.stringify(userAcc.allPlans));
@@ -204,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(response => response.json().then(data => ({ status: response.status, body: data })))
             .then(res => {
-                if (res.status === 400) {
+                if (res.status === 400 || res.status === 409) {
                     showLoginError(res.body.detail || 'Login failed.');
                     return;
                 } else if (res.status !== 200) {
@@ -217,6 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('mockbee_user_email', res.body.email);
                 localStorage.setItem('mockbee_is_admin', res.body.is_admin ? 'true' : 'false');
                 localStorage.setItem('mockbee_role', res.body.role || 'PUBLIC');
+                localStorage.setItem('mockbee_is_student', res.body.is_student ? 'true' : 'false');
+                if (res.body.admin_token) localStorage.setItem('mockbee_admin_token', res.body.admin_token);
+                else localStorage.removeItem('mockbee_admin_token');
                 
                 // Admin redirect
                 if (res.body.is_admin) {
@@ -226,10 +228,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                if (res.body.role === 'PREMIUM') {
-                    // Admin-created user: fully subscribed
+                if (res.body.is_student || res.body.role === 'STUDENT') {
+                    // Admin-created student: bypass subscription locks without marking as premium.
                     localStorage.setItem('mockbee_subscribed', 'true');
-                    localStorage.setItem('mockbee_subscribed_plan', 'elite_plan');
+                    localStorage.setItem('mockbee_subscribed_plan', 'student_access');
                 } else {
                     // Restore subscription status from account registry if available
                     const accounts = JSON.parse(localStorage.getItem('mockbee_accounts') || '{}');

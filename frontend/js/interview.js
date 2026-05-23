@@ -749,7 +749,8 @@ function showResultsButton() {
     scrollToBottom();
 
     // Demo modal for standard mode
-    if (typeof showDemoModal === 'function' && currentMode !== '1-q' && currentMode !== '5-min' && currentMode !== 'rapid' && currentMode !== 'warmup') {
+    const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+    if (!isStudent && typeof showDemoModal === 'function' && currentMode !== '1-q' && currentMode !== '5-min' && currentMode !== 'rapid' && currentMode !== 'warmup') {
         setTimeout(showDemoModal, 800);
     }
 

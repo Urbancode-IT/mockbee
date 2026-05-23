@@ -15,37 +15,46 @@ document.addEventListener('DOMContentLoaded', () => {
             const provider = titleAttr.replace('Sign in with ', '');
             if (!provider || provider === '') return;
 
-            const mockName = `${provider} User`;
-            const mockEmail = `${provider.toLowerCase()}-auth@mockbee.com`;
-            const mockPassword = `oauth_token_${provider.toLowerCase()}`;
+            let oauthEmail = prompt(`Enter the email for your ${provider} account:`) || '';
+            oauthEmail = oauthEmail.trim().toLowerCase();
+            if (!oauthEmail || !oauthEmail.includes('@')) {
+                alert('A valid email is required to continue.');
+                return;
+            }
+            const defaultName = oauthEmail.split('@')[0] || `${provider} User`;
+            const oauthName = prompt(`Enter your ${provider} account name:`, defaultName) || defaultName;
 
-            // Register directly via backend API
-            fetch(`${API_BASE}/api/signup`, {
+            fetch(`${API_BASE}/api/oauth-login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: mockName, email: mockEmail, password: mockPassword })
+                body: JSON.stringify({ provider, email: oauthEmail, name: oauthName })
             })
             .then(res => res.json())
             .then(regData => {
-                if (regData.status === 'success' || regData.detail === 'Account already exists. Try logging in.') {
-                    // Success, or it was already made earlier! Log them in:
-                    localStorage.setItem('mockbee_user_name', mockName);
-                    localStorage.setItem('mockbee_user_email', mockEmail);
-                    localStorage.setItem('mockbee_subscribed', 'false');
+                if (regData.status === 'success') {
+                    localStorage.setItem('mockbee_user_name', regData.name || oauthName);
+                    localStorage.setItem('mockbee_user_email', regData.email || oauthEmail);
+                    localStorage.setItem('mockbee_role', regData.role || 'PUBLIC');
+                    localStorage.setItem('mockbee_is_student', regData.is_student ? 'true' : 'false');
+                    if (regData.is_student) {
+                        localStorage.setItem('mockbee_subscribed', 'true');
+                        localStorage.setItem('mockbee_subscribed_plan', 'student_access');
+                    } else {
+                        localStorage.setItem('mockbee_subscribed', 'false');
+                    }
                     
-                    localStorage.removeItem('mockbee_subscribed_plan');
+                    if (!regData.is_student) localStorage.removeItem('mockbee_subscribed_plan');
                     localStorage.removeItem('mockbee_all_plans');
                     localStorage.removeItem('mockbee_interviews');
                     localStorage.removeItem('mockbee_activities');
 
                     window.location.href = 'dashboard.html';
                 } else {
-                    alert(`Failed to simulate ${provider} registration.`);
+                    alert(regData.detail || `Failed to continue with ${provider}.`);
                 }
             }).catch(err => {
-                // If backend fails, fallback to local simulate!
-                localStorage.setItem('mockbee_user_name', mockName);
-                localStorage.setItem('mockbee_user_email', mockEmail);
+                localStorage.setItem('mockbee_user_name', oauthName);
+                localStorage.setItem('mockbee_user_email', oauthEmail);
                 window.location.href = 'dashboard.html';
             });
         });
@@ -157,6 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Set session
                 localStorage.setItem('mockbee_user_name', fullname);
                 localStorage.setItem('mockbee_user_email', email);
+                localStorage.setItem('mockbee_role', 'PUBLIC');
+                localStorage.setItem('mockbee_is_student', 'false');
                 localStorage.setItem('mockbee_subscribed', 'false');
                 localStorage.setItem('mockbee_send_welcome_email', 'true'); // Flag for welcome email
                 
@@ -189,6 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('mockbee_accounts', JSON.stringify(accounts));
                 localStorage.setItem('mockbee_user_name', fullname);
                 localStorage.setItem('mockbee_user_email', email);
+                localStorage.setItem('mockbee_role', 'PUBLIC');
+                localStorage.setItem('mockbee_is_student', 'false');
                 localStorage.setItem('mockbee_subscribed', 'false');
                 localStorage.setItem('mockbee_send_welcome_email', 'true');
                 localStorage.removeItem('mockbee_subscribed_plan');

@@ -126,7 +126,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             const isSubscribed = localStorage.getItem('mockbee_subscribed') === 'true';
             const subscribedPlan = localStorage.getItem('mockbee_subscribed_plan');
-            const isElite = isSubscribed && subscribedPlan === 'pro';
+            const isStudent = localStorage.getItem('mockbee_role') === 'STUDENT' || localStorage.getItem('mockbee_is_student') === 'true';
+            const isElite = isStudent || (isSubscribed && subscribedPlan === 'pro');
 
             const cards = document.querySelectorAll('.company-card');
             cards.forEach(card => {

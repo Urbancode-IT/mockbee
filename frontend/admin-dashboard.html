@@ -427,7 +427,7 @@
             <div style="display:flex;gap:10px;align-items:center">
                 <select id="filter-user-type" style="padding:8px 12px; border-radius:8px; border:1px solid var(--cream-dark); font-family:'Inter'; outline:none; font-size: 0.85rem; color: var(--text-dark);">
                     <option value="ALL">All Users</option>
-                    <option value="PREMIUM">Students (Admin Created)</option>
+                    <option value="STUDENT">Students (Admin Created)</option>
                     <option value="PUBLIC">Public Users (Self Registered)</option>
                 </select>
                 <div class="search-box">
@@ -475,7 +475,7 @@
 
     <script src="js/config.js"></script>
     <script>
-        const ADMIN_KEY = 'mockb@urban';
+        const ADMIN_KEY = localStorage.getItem('mockbee_admin_token') || '';
         let allUsers = [];
         let allSessions = [];
 
@@ -484,12 +484,17 @@
             alert('Access Denied. Admin only.');
             window.location.href = 'login.html';
         }
+        if (!ADMIN_KEY) {
+            alert('Admin session expired. Please log in again.');
+            window.location.href = 'login.html';
+        }
 
         // ── Logout ──
         document.getElementById('admin-logout-btn').addEventListener('click', () => {
             localStorage.removeItem('mockbee_user_name');
             localStorage.removeItem('mockbee_user_email');
             localStorage.removeItem('mockbee_is_admin');
+            localStorage.removeItem('mockbee_admin_token');
             window.location.href = 'login.html';
         });
 
@@ -633,7 +638,7 @@
                     <td>${i + 1}</td>
                     <td class="email-col">${s.user_email || '—'}</td>
                     <td><span class="role-tag">${s.role || '—'}</span></td>
-                    <td><span class="role-tag" style="${s.user_role === 'PREMIUM' ? 'background:#E8F5E9; color:#2E7D32' : ''}">${s.user_role === 'PREMIUM' ? 'Student' : 'Public'}</span></td>
+                    <td><span class="role-tag" style="${s.user_role === 'STUDENT' ? 'background:#E8F5E9; color:#2E7D32' : ''}">${s.user_role === 'STUDENT' ? 'Student' : 'Public'}</span></td>
                     <td><span class="score-badge ${badgeClass}">${badgeText}</span></td>
                     <td>${date}</td>
                     <td>${savedAt}</td>
@@ -682,6 +687,61 @@
 
         // ── Refresh ──
         document.getElementById('refresh-btn').addEventListener('click', loadData);
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+        }
+
+        function scoreValue(session, key, fallback = null) {
+            const analysis = session.analysis || {};
+            const value = analysis[key];
+            return typeof value === 'number' ? value : fallback;
+        }
+
+        function categoryRows(session) {
+            const analysis = session.analysis || {};
+            const phaseFeedback = analysis.phase_feedback || {};
+            const overall = session.score ?? analysis.overall ?? null;
+            const categories = [
+                ['Overall Readiness', overall, analysis.feedback || analysis.summary || 'No summary generated yet.'],
+                ['Communication Clarity', scoreValue(session, 'clarity', scoreValue(session, 'selfIntro')), 'Assesses how clearly the candidate explained ideas, structured responses, and handled introductions.'],
+                ['Technical Knowledge', scoreValue(session, 'technical'), 'Assesses role-specific correctness, depth, terminology, and practical problem-solving.'],
+                ['Confidence & Presence', scoreValue(session, 'confidence'), 'Assesses confidence, consistency, and how comfortably the candidate handled follow-up pressure.'],
+                ['Projects & Skills', scoreValue(session, 'projects_skills'), phaseFeedback.projects_skills || 'Assesses ability to connect projects, tools, and experience to the target role.'],
+                ['Optimization & Problem Solving', scoreValue(session, 'optimization'), phaseFeedback.optimization || 'Assesses approach to trade-offs, efficiency, constraints, and improvements.'],
+                ['Behavioural Fit', scoreValue(session, 'behavioural'), phaseFeedback.behavioural || 'Assesses teamwork, ownership, conflict handling, and STAR-style storytelling.'],
+                ['HR & Logistics', scoreValue(session, 'hr_logistics'), phaseFeedback.hr_logistics || 'Assesses professional expectations, availability, and closing communication.']
+            ];
+
+            return categories.map(([name, score, note]) => {
+                const scoreText = typeof score === 'number' ? `${Math.round(score)}%` : 'Not scored';
+                return `
+                    <tr>
+                        <td style="padding:10px 12px; border-bottom:1px solid #eee; font-weight:700;">${escapeHtml(name)}</td>
+                        <td style="padding:10px 12px; border-bottom:1px solid #eee; width:100px;">${scoreText}</td>
+                        <td style="padding:10px 12px; border-bottom:1px solid #eee;">${escapeHtml(note)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function listHtml(title, items) {
+            const safeItems = Array.isArray(items) && items.length ? items : ['Not enough analysed data available.'];
+            return `
+                <div style="margin-bottom:18px;">
+                    <h3 style="font-size:16px; margin-bottom:8px; color:#1A1A1A;">${title}</h3>
+                    <ul style="margin:0; padding-left:20px; font-size:13px; line-height:1.7;">
+                        ${safeItems.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
 
         // ── Add Student ──
         document.getElementById('add-student-btn').addEventListener('click', () => {
@@ -769,23 +829,31 @@
         function showOverview(sessionId) {
             const session = allSessions.find(s => s.id === sessionId);
             if (!session) return;
+            const overviewScore = session.score ?? (session.analysis || {}).overall ?? null;
 
             let html = `
                 <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px;">
-                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Candidate:</strong> ${session.user_email}</div>
-                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Role:</strong> ${session.role}</div>
-                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Score:</strong> ${session.score}%</div>
+                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Candidate:</strong> ${escapeHtml(session.user_email)}</div>
+                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Role:</strong> ${escapeHtml(session.role)}</div>
+                    <div style="background: #f5f5f5; padding: 10px 15px; border-radius: 8px;"><strong>Score:</strong> ${overviewScore !== null ? `${overviewScore}%` : 'Not scored'}</div>
                 </div>
             `;
 
-            if (session.analysis && session.analysis.summary) {
-                html += `
-                    <h3 style="margin-bottom:10px; color:var(--navy);">Performance Summary</h3>
-                    <div style="background:#fffcf9; padding:20px; border-left:4px solid var(--gold); border-radius:4px; margin-bottom:20px; font-size:15px; white-space:pre-wrap;">${session.analysis.summary}</div>
-                `;
-            } else {
-                html += `<p style="color: #666; font-style: italic;">No summary available.</p>`;
-            }
+            html += `
+                <h3 style="margin-bottom:10px; color:var(--navy);">Professional Performance Report</h3>
+                <table style="width:100%; border-collapse:collapse; background:#fff; font-size:0.86rem; margin-bottom:20px;">
+                    <thead>
+                        <tr style="background:#1A1A1A; color:#fff;">
+                            <th style="padding:10px 12px; text-align:left;">Category</th>
+                            <th style="padding:10px 12px; text-align:left;">Score</th>
+                            <th style="padding:10px 12px; text-align:left;">Admin Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>${categoryRows(session)}</tbody>
+                </table>
+                ${listHtml('Core Strengths', (session.analysis || {}).strengths)}
+                ${listHtml('Areas to Improve', (session.analysis || {}).improvements)}
+            `;
 
             document.getElementById('overview-content').innerHTML = html;
             document.getElementById('overview-modal').style.display = 'flex';
@@ -810,37 +878,38 @@
             container.style.fontFamily = 'Inter, sans-serif';
             container.style.color = '#1A1A1A';
             
+            const analysis = session.analysis || {};
+            const overallScore = session.score ?? analysis.overall ?? null;
             let html = `
-                <h1 style="font-size:24px; color:#1A1A1A; margin-bottom:10px;">MockBee Interview Report</h1>
-                <p><strong>Candidate:</strong> ${session.user_email}</p>
-                <p><strong>Role:</strong> ${session.role}</p>
-                <p><strong>Score:</strong> ${session.score}%</p>
-                <p><strong>Date:</strong> ${session.date}</p>
+                <h1 style="font-size:24px; color:#1A1A1A; margin-bottom:6px;">MockBee Professional Candidate Report</h1>
+                <p style="font-size:12px; color:#666; margin-bottom:18px;">Prepared for admin review and hiring decisions.</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; font-size:13px; margin-bottom:18px;">
+                    <p><strong>Candidate:</strong> ${escapeHtml(session.candidate_name || session.user_email)}</p>
+                    <p><strong>Email:</strong> ${escapeHtml(session.user_email)}</p>
+                    <p><strong>Interview Role:</strong> ${escapeHtml(session.role)}</p>
+                    <p><strong>User Type:</strong> ${session.user_role === 'STUDENT' ? 'Student' : 'Public'}</p>
+                    <p><strong>Overall Score:</strong> ${overallScore !== null ? `${overallScore}%` : 'Not scored'}</p>
+                    <p><strong>Date:</strong> ${escapeHtml(session.date || 'Not available')}</p>
+                </div>
                 <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+                <h2 style="font-size:19px; margin-bottom:10px; color:#1A1A1A;">Performance by Category</h2>
+                <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:20px;">
+                    <thead>
+                        <tr style="background:#1A1A1A; color:#fff;">
+                            <th style="padding:9px 10px; text-align:left;">Category</th>
+                            <th style="padding:9px 10px; text-align:left;">Score</th>
+                            <th style="padding:9px 10px; text-align:left;">Admin Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>${categoryRows(session)}</tbody>
+                </table>
+                ${listHtml('Core Strengths', analysis.strengths)}
+                ${listHtml('Areas to Improve', analysis.improvements)}
+                <h3 style="font-size:16px; margin-bottom:8px; color:#1A1A1A;">Decision Summary</h3>
+                <div style="background:#f9f9f9; padding:14px; border-left:4px solid #D8C4B6; font-size:13px; line-height:1.6;">
+                    ${escapeHtml(analysis.feedback || analysis.summary || 'Open the user report to generate AI feedback before making a final decision.')}
+                </div>
             `;
-            
-            if (session.analysis && session.analysis.summary) {
-                html += `
-                    <h3 style="font-size:18px; margin-bottom:10px; color:#1A1A1A;">Feedback Summary</h3>
-                    <div style="background:#f9f9f9; padding:15px; border-left:4px solid #D8C4B6; margin-bottom:20px; font-size:14px; white-space:pre-wrap;">${session.analysis.summary}</div>
-                `;
-            }
-            
-            html += `<h3 style="font-size:18px; margin-bottom:10px; color:#1A1A1A;">Interview Transcript</h3>`;
-            
-            if (session.transcript && session.transcript.length > 0) {
-                session.transcript.forEach(msg => {
-                    const isAI = msg.role === 'assistant';
-                    html += `
-                        <div style="margin-bottom:15px;">
-                            <strong style="color:${isAI ? '#B09E93' : '#27AE60'}">${isAI ? 'Interviewer' : 'Candidate'}:</strong>
-                            <p style="margin-top:5px; font-size:14px;">${msg.content}</p>
-                        </div>
-                    `;
-                });
-            } else {
-                html += `<p style="font-size:14px;">No transcript available.</p>`;
-            }
             
             container.innerHTML = html;
             

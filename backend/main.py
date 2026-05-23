@@ -3,10 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 import db
+import email_service
 import mocker
 import json
 import os
 import random
+import re
+import secrets
+import datetime
 
 # Load custom questions
 try:
@@ -82,6 +86,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+ADMIN_DEFAULT_USERNAME = os.environ.get("MOCKBEE_ADMIN_USERNAME", "admin")
+ADMIN_DEFAULT_PASSWORD = os.environ.get("MOCKBEE_ADMIN_PASSWORD", "mockb@urban")
+
+def _normalise_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+def _is_student_role(role: str) -> bool:
+    return role in {"STUDENT", "PREMIUM"}
+
+def _ensure_admin_user() -> dict:
+    users = db._col("users")
+    admin = users.find_one({"role": "ADMIN"})
+    if admin:
+        if not admin.get("admin_token"):
+            users.update_one({"_id": admin["_id"]}, {"$set": {"admin_token": secrets.token_urlsafe(32)}})
+            admin = users.find_one({"_id": admin["_id"]})
+        return admin
+
+    admin_id = _normalise_email(ADMIN_DEFAULT_USERNAME)
+    admin_doc = {
+        "_id": admin_id,
+        "name": "Admin",
+        "username": ADMIN_DEFAULT_USERNAME,
+        "password": ADMIN_DEFAULT_PASSWORD,
+        "role": "ADMIN",
+        "admin_token": secrets.token_urlsafe(32),
+        "created_by": "system",
+        "created_at": db._now(),
+        "last_seen": db._now(),
+    }
+    users.update_one({"_id": admin_id}, {"$setOnInsert": admin_doc}, upsert=True)
+    return users.find_one({"_id": admin_id})
+
+def _require_admin(token: str):
+    _ensure_admin_user()
+    if not token or not db._col("users").find_one({"role": "ADMIN", "admin_token": token}):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+def _public_user_payload(user: dict, is_admin: bool = False) -> dict:
+    role = user.get("role", "PUBLIC")
+    return {
+        "status": "success",
+        "name": user.get("name"),
+        "email": user.get("_id"),
+        "is_admin": is_admin,
+        "role": "STUDENT" if role == "PREMIUM" else role,
+        "is_student": _is_student_role(role),
+        "admin_token": user.get("admin_token") if is_admin else None,
+    }
+
 class SignupRequest(BaseModel):
     name: str
     email: str
@@ -94,35 +148,76 @@ class LoginRequest(BaseModel):
 @app.post("/api/signup")
 def signup(req: SignupRequest):
     users = db._col("users")
-    user = users.find_one({"_id": req.email})
+    email = _normalise_email(req.email)
+    user = users.find_one({"_id": email})
     if user:
         raise HTTPException(status_code=400, detail="Account already exists. Try logging in.")
-    db.upsert_user(req.email, req.name, role="PUBLIC")
-    users.update_one({"_id": req.email}, {"$set": {"password": req.password}})
-    return {"status": "success", "message": "Account created"}
-
-# ── Admin credentials (hardcoded) ─────────────────────────────────────────────
-ADMIN_EMAIL = "admin"
-ADMIN_PASSWORD = "mockb@urban"
+    db.upsert_user(email, req.name.strip(), role="PUBLIC")
+    users.update_one({"_id": email}, {"$set": {"password": req.password}})
+    email_service.send_welcome_email(email, req.name.strip())
+    return {"status": "success", "message": "Account created", "email": email, "name": req.name.strip(), "role": "PUBLIC"}
 
 @app.post("/api/login")
 def login(req: LoginRequest):
-    # Admin login check
-    if req.email == ADMIN_EMAIL and req.password == ADMIN_PASSWORD:
-        return {"status": "success", "name": "Admin", "email": ADMIN_EMAIL, "is_admin": True, "role": "ADMIN"}
-
     users = db._col("users")
-    user = users.find_one({
-        "$or": [
-            {"_id": req.email},
-            {"name": {"$regex": f"^{req.email}$", "$options": "i"}}
-        ]
-    })
-    if not user:
+    _ensure_admin_user()
+    identifier = (req.email or "").strip()
+    identifier_lc = identifier.lower()
+
+    if "@" in identifier_lc:
+        candidates = list(users.find({"_id": identifier_lc}))
+    else:
+        escaped = re.escape(identifier)
+        candidates = list(users.find({
+            "$or": [
+                {"username": {"$regex": f"^{escaped}$", "$options": "i"}},
+                {"name": {"$regex": f"^{escaped}$", "$options": "i"}},
+            ]
+        }))
+
+    if not candidates:
         raise HTTPException(status_code=400, detail="No account found with this email or username.")
-    if user.get("password") != req.password:
+
+    password_matches = [user for user in candidates if user.get("password") == req.password]
+    if not password_matches:
         raise HTTPException(status_code=400, detail="Incorrect password.")
-    return {"status": "success", "name": user.get("name"), "email": user.get("_id"), "is_admin": False, "role": user.get("role", "PUBLIC")}
+
+    if "@" not in identifier_lc and len(password_matches) > 1:
+        raise HTTPException(status_code=409, detail="Multiple users match that username and password. Please log in with your email address.")
+
+    user = password_matches[0]
+    users.update_one({"_id": user["_id"]}, {"$set": {"last_seen": db._now()}})
+    return _public_user_payload(user, is_admin=user.get("role") == "ADMIN")
+
+class OAuthLoginRequest(BaseModel):
+    provider: str
+    email: str
+    name: Optional[str] = None
+
+@app.post("/api/oauth-login")
+def oauth_login(req: OAuthLoginRequest):
+    email = _normalise_email(req.email)
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="A valid email is required for social login.")
+
+    provider = (req.provider or "google").strip().lower()
+    name = (req.name or email.split("@")[0]).strip()
+    users = db._col("users")
+    existing = users.find_one({"_id": email})
+
+    if existing and existing.get("role") == "ADMIN":
+        raise HTTPException(status_code=400, detail="Admin accounts must use password login.")
+
+    if not existing:
+        db.upsert_user(email, name, role="PUBLIC")
+        users.update_one({"_id": email}, {"$set": {"auth_provider": provider, "password": f"oauth:{provider}:{email}"}})
+        existing = users.find_one({"_id": email})
+        email_service.send_welcome_email(email, name)
+    else:
+        users.update_one({"_id": email}, {"$set": {"last_seen": db._now(), "auth_provider": existing.get("auth_provider", provider)}})
+        existing = users.find_one({"_id": email})
+
+    return _public_user_payload(existing, is_admin=False)
 
 class ChatRequest(BaseModel):
     role: str
@@ -135,7 +230,7 @@ class ChatRequest(BaseModel):
 def interview_chat(req: ChatRequest):
     phase = req.phase
     if phase == "pro_feedback":
-        system_prompt = f"""You are an expert technical interviewer providing concise feedback.
+        system_prompt = f"""You are an expert technical interviewer providing concise feedback. b
 Role: {req.role} | Level: {req.level}
 
 The candidate has just answered a technical or behavioural question.
@@ -207,11 +302,12 @@ class SaveSessionRequest(BaseModel):
 @app.post("/api/interview/save")
 def save_interview(req: SaveSessionRequest):
     col = db._col("interview_sessions")
+    user_email = _normalise_email(req.email)
     quick_modes = {"1-q", "5-min", "rapid", "warmup"}
     is_quick = req.isQuick if req.isQuick is not None else req.mode in quick_modes
     is_pro = req.isPro if req.isPro is not None else not is_quick
     doc = {
-        "user_email": req.email,
+        "user_email": user_email,
         "role": req.role,
         "mode": req.mode,
         "date": req.date,
@@ -230,11 +326,66 @@ def save_interview(req: SaveSessionRequest):
     
     # Simple upsert based on the frontend's unique session id
     col.update_one(
-        {"user_email": req.email, "id": doc["id"]},
+        {"user_email": user_email, "id": doc["id"]},
         {"$set": doc},
         upsert=True
     )
+    if req.analysis and req.score is not None:
+        users = db._col("users")
+        user = users.find_one({"_id": user_email}) or {}
+        sent_report_ids = user.get("report_email_session_ids") or []
+        should_send = doc["id"] not in sent_report_ids
+        if should_send:
+            event = email_service.send_interview_report_email(user_email, user.get("name", ""), doc)
+            if event.get("status") in {"sent", "skipped"}:
+                users.update_one(
+                    {"_id": user_email},
+                    {"$addToSet": {"report_email_session_ids": doc["id"]}, "$set": {"last_report_email_at": db._now()}},
+                )
     return {"status": "success", "message": "Performance saved to DB"}
+
+class TaskCompletionEmailRequest(BaseModel):
+    email: str
+    task_name: str
+    detail: Optional[str] = ""
+
+@app.post("/api/email/task-completed")
+def email_task_completed(req: TaskCompletionEmailRequest):
+    email = _normalise_email(req.email)
+    user = db._col("users").find_one({"_id": email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    event = email_service.send_task_completion_email(email, user.get("name", ""), req.task_name, req.detail or "")
+    return {"status": "success", "email_status": event.get("status")}
+
+@app.post("/api/admin/email/reminders")
+def admin_send_inactivity_reminders(key: str, inactive_days: int = 7, limit: int = 100):
+    _require_admin(key)
+    if inactive_days < 1:
+        raise HTTPException(status_code=400, detail="inactive_days must be at least 1")
+
+    cutoff = email_service._utc_now() - datetime.timedelta(days=inactive_days)
+    users = db._col("users")
+    candidates = list(users.find({"role": {"$ne": "ADMIN"}}, {"password": 0}).limit(max(1, min(limit, 500))))
+    results = []
+
+    for user in candidates:
+        email = user.get("_id")
+        last_seen = email_service.parse_db_datetime(user.get("last_seen") or user.get("created_at"))
+        if not last_seen or last_seen > cutoff:
+            continue
+
+        last_reminder = email_service.parse_db_datetime(user.get("last_inactivity_reminder_at"))
+        if last_reminder and last_reminder > cutoff:
+            continue
+
+        inactive_for = max(inactive_days, (email_service._utc_now() - last_seen).days)
+        event = email_service.send_inactivity_reminder_email(email, user.get("name", ""), inactive_for)
+        if event.get("status") in {"sent", "skipped"}:
+            users.update_one({"_id": email}, {"$set": {"last_inactivity_reminder_at": db._now()}})
+        results.append({"email": email, "status": event.get("status")})
+
+    return {"status": "success", "checked": len(candidates), "queued": len(results), "results": results}
 
 @app.get("/api/interview/history")
 def get_user_history(email: str):
@@ -269,11 +420,12 @@ def get_company_prep_questions(company: str = "Google", topic: Optional[str] = N
 @app.get("/api/admin/users")
 def admin_get_all_users(key: str):
     """Returns all registered users. Requires admin key for access."""
-    if key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_admin(key)
     users = list(db._col("users").find({}, {"password": 0}))
     for u in users:
         u["email"] = u.pop("_id")
+        if u.get("role") == "PREMIUM":
+            u["role"] = "STUDENT"
     return {"status": "success", "users": users}
 
 class AdminCreateUserRequest(BaseModel):
@@ -285,37 +437,38 @@ class AdminCreateUserRequest(BaseModel):
 @app.post("/api/admin/users")
 def admin_create_user(req: AdminCreateUserRequest):
     """Creates a new admin-managed user (Student) that has free access."""
-    if req.key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_admin(req.key)
     users = db._col("users")
-    if users.find_one({"_id": req.email}):
+    email = _normalise_email(req.email)
+    if users.find_one({"_id": email}):
         raise HTTPException(status_code=400, detail="User already exists")
-    db.upsert_user(req.email, req.name, role="PREMIUM", created_by="admin")
-    users.update_one({"_id": req.email}, {"$set": {"password": req.password}})
+    db.upsert_user(email, req.name.strip(), role="STUDENT", created_by="admin")
+    users.update_one({"_id": email}, {"$set": {"password": req.password, "student_access": True}})
     return {"status": "success", "message": "Student created successfully"}
 
 @app.get("/api/admin/sessions")
 def admin_get_all_sessions(key: str):
     """Returns all interview sessions across all users. Requires admin key."""
-    if key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_admin(key)
     docs = list(db._col("interview_sessions").find({}, {"_id": 0}).sort("saved_at", -1))
 
     users_dict = {u["_id"]: u for u in db._col("users").find({})}
     for d in docs:
         user_email = d.get("user_email")
         if user_email in users_dict:
-            d["user_role"] = users_dict[user_email].get("role", "PUBLIC")
+            role = users_dict[user_email].get("role", "PUBLIC")
+            d["user_role"] = "STUDENT" if _is_student_role(role) else role
+            d["candidate_name"] = users_dict[user_email].get("name", "")
         else:
             d["user_role"] = "PUBLIC"
+            d["candidate_name"] = ""
 
     return {"status": "success", "sessions": docs}
 
 @app.delete("/api/admin/users/{email}")
 def admin_delete_user(email: str, key: str):
     """Deletes a user and all their sessions. Requires admin key."""
-    if key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_admin(key)
     db._col("users").delete_one({"_id": email})
     db._col("interview_sessions").delete_many({"user_email": email})
     return {"status": "success", "message": "User and their sessions deleted"}
@@ -323,8 +476,7 @@ def admin_delete_user(email: str, key: str):
 @app.delete("/api/admin/sessions/{session_id}")
 def admin_delete_session(session_id: str, key: str):
     """Deletes a specific interview session. Requires admin key."""
-    if key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    _require_admin(key)
     db._col("interview_sessions").delete_one({"id": session_id})
     return {"status": "success", "message": "Session deleted"}
 
