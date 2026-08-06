@@ -230,7 +230,7 @@
   flex-direction: column !important;
   align-items: stretch !important;
   box-shadow: none !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   box-sizing: border-box;
 }
 
@@ -300,19 +300,33 @@
   background: transparent !important;
   border-radius: 0 !important;
   display: flex !important;
-  align-items: flex-end !important;
+  align-items: center !important;
   justify-content: center !important;
-  padding: 8px 20px 32px !important;
-  min-height: 260px !important;
+  padding: 8px 12px 32px !important;
+  min-height: 240px !important;
   box-shadow: none !important;
+  overflow: visible !important;
 }
 
 .landing-page .resume-preview-lottie {
   width: 100%;
-  max-width: 340px;
-  min-height: 280px;
+  max-width: 100%;
+  min-height: 220px;
+  height: 240px;
+  overflow: visible;
   filter: sepia(0.8) hue-rotate(335deg) saturate(1.5) brightness(0.9) contrast(1.1);
-  transform: scale(1.05);
+  transform: none;
+}
+
+.landing-page .resume-preview-lottie svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  overflow: visible !important;
+  display: block;
+  margin: 0 auto;
+  transform: scale(0.88);
+  transform-origin: center center;
 }
 
 .landing-page .testimonial-card--small {
