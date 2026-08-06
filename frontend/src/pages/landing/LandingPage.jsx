@@ -215,7 +215,7 @@ export default function LandingPage() {
     }
   }, [roleModalOpen])
 
-  /* Resume preview Lottie — matches legacy index.html */
+  /* Resume preview Lottie — expand viewBox so animated cards aren't clipped */
   useEffect(() => {
     const container = lottieRef.current
     if (!container) return undefined
@@ -226,7 +226,23 @@ export default function LandingPage() {
       loop: true,
       autoplay: true,
       path: LOTTIE_RESUME,
+      rendererSettings: {
+        preserveAspectRatio: 'xMidYMid meet',
+        viewBoxOnly: false,
+      },
     })
+
+    const fixSvgClip = () => {
+      const svg = container.querySelector('svg')
+      if (!svg) return
+      svg.style.overflow = 'visible'
+      svg.setAttribute('overflow', 'visible')
+      /* Animation layers move left of 0 — widen viewBox so left card stays visible */
+      svg.setAttribute('viewBox', '-80 120 980 680')
+    }
+
+    animation.addEventListener('DOMLoaded', fixSvgClip)
+    animation.addEventListener('data_ready', fixSvgClip)
 
     return () => animation.destroy()
   }, [])
