@@ -1,0 +1,204 @@
+.settings-page {
+  --cream-bg: #ffffff;
+  --cream-dark: #f8f5f2;
+  --gold: #d8c4b6;
+  --gold-dark: #b09e93;
+  --navy: #1a1a1a;
+  --text-medium: #666;
+  --border-color: #e9e4e2;
+  font-family: 'Satoshi', sans-serif;
+  background: #ffffff;
+  padding: 20px 30px;
+  color: var(--navy);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.settings-page h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  margin-bottom: 25px;
+  font-weight: 900;
+}
+
+.settings-page .settings-card {
+  background: #fff;
+  border: 1.2px solid var(--border-color);
+  padding: 30px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-page .settings-card:hover {
+  transform: translateY(-3px);
+}
+
+.settings-page .form-group {
+  margin-bottom: 20px;
+}
+
+.settings-page .form-group label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  color: var(--text-medium);
+}
+
+.settings-page .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-page .form-group input,
+.settings-page .form-group select {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
+  outline: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 0.88rem;
+  transition: all 0.3s ease;
+  color: var(--navy);
+  background: #fff;
+}
+
+.settings-page .form-group select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231A1A1A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 14px;
+}
+
+.settings-page .toggle-password {
+  position: absolute;
+  right: 15px;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 5px;
+  transition: color 0.3s;
+  background: none;
+  border: none;
+}
+
+.settings-page .toggle-password:hover {
+  color: var(--navy);
+}
+
+.settings-page .form-group input:focus,
+.settings-page .form-group select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(216, 196, 182, 0.1);
+}
+
+.settings-page input:-webkit-autofill,
+.settings-page input:-webkit-autofill:hover,
+.settings-page input:-webkit-autofill:focus,
+.settings-page input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 40px #fff inset !important;
+  -webkit-text-fill-color: var(--navy) !important;
+}
+
+.settings-page .btn-wrapper {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.settings-page .btn-save {
+  background: var(--navy);
+  color: var(--gold);
+  border: none;
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.settings-page .btn-cancel {
+  background: #fdfbfa;
+  color: #888;
+  border: 1.5px solid var(--border-color);
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.settings-page .btn-cancel:hover {
+  background: var(--gold);
+  color: var(--navy);
+  border-color: var(--gold);
+}
+
+.settings-page .btn-save:hover {
+  background: #000;
+  transform: scale(1.04);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.settings-page .btn-save:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.settings-page .btn-back-settings {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #fff;
+  color: var(--navy);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1.5px solid var(--border-color);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.settings-page .btn-back-settings:hover {
+  transform: translateX(-5px);
+  background: var(--gold);
+  color: var(--navy);
+  border-color: var(--gold);
+}
+
+.settings-page .settings-toast {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.settings-page .settings-toast.success {
+  background: #e8f8ef;
+  color: #27ae60;
+}
+
+.settings-page .settings-toast.error {
+  background: #fdecea;
+  color: #c0392b;
+}

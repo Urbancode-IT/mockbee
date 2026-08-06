@@ -1,0 +1,190 @@
+.roles-page {
+  --cream-bg: #ffffff;
+  --gold: #d8c4b6;
+  --gold-dark: #b09e93;
+  --navy: #1a1a1a;
+  --text-dark: #1a1a1a;
+  --text-medium: #4a4a4a;
+  font-family: 'Satoshi', sans-serif;
+  background: var(--cream-bg);
+  padding: 20px 30px;
+  color: var(--text-dark);
+}
+
+.roles-page h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+}
+
+.roles-page .roles-intro {
+  margin-bottom: 40px;
+  color: var(--text-medium);
+}
+
+.roles-page .role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+}
+
+.roles-page .role-card {
+  border: 1px solid #eee;
+  padding: 20px;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  background: #fff;
+}
+
+.roles-page .role-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.roles-page .role-card i {
+  font-size: 1.8rem;
+  color: var(--gold-dark);
+  margin-bottom: 15px;
+  display: block;
+}
+
+.roles-page .role-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.roles-page .role-card p {
+  font-size: 0.8rem;
+  color: var(--text-medium);
+  line-height: 1.4;
+}
+
+.roles-page .active-role {
+  border-color: var(--gold);
+  background: #faf9f8;
+}
+
+.roles-page .locked-role {
+  position: relative;
+  cursor: not-allowed;
+  overflow: hidden;
+}
+
+.roles-page .locked-role::before {
+  content: '\f023';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.5rem;
+  color: var(--gold-dark);
+  opacity: 0.15;
+  z-index: 1;
+  transition: all 0.3s;
+}
+
+.roles-page .locked-role::after {
+  content: 'Subscribe to access';
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--navy);
+  color: #ffffff;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.3s;
+  opacity: 0;
+  z-index: 10;
+}
+
+.roles-page .locked-role:hover::after {
+  bottom: 10px;
+  opacity: 1;
+}
+
+.roles-page .locked-role:hover::before {
+  opacity: 0.8;
+  transform: translate(-50%, -60%);
+}
+
+.roles-page .locked-role > * {
+  opacity: 0.4;
+  filter: blur(1px);
+}
+
+.roles-page .btn-start-mock-hover {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--navy);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.roles-page .role-card:not(.locked-role):hover .btn-start-mock-hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.roles-page .role-card:not(.locked-role):hover {
+  background-color: #fff;
+  border-color: var(--gold);
+}
+
+.roles-page .pro-label {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 900;
+  color: #27ae60;
+  margin-top: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+.roles-page .role-card:not(.locked-role):hover .pro-label {
+  opacity: 0.2;
+}
+
+.roles-page .pro-label.is-pro-yellow {
+  color: #f2c94c !important;
+}
+
+.roles-page .free-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #27ae60;
+  color: #fff;
+  font-size: 0.55rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 900;
+}

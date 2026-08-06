@@ -1,0 +1,245 @@
+.roadmap-page {
+  --cream-bg: #ffffff;
+  --cream-dark: #f8f5f2;
+  --gold: #d8c4b6;
+  --gold-dark: #b09e93;
+  --navy: #1a1a1a;
+  --text-dark: #1a1a1a;
+  --text-medium: #4a4a4a;
+  --border-color: #e9e4e2;
+  --success: #27ae60;
+  font-family: 'Satoshi', sans-serif;
+  background-color: var(--cream-bg);
+  color: var(--text-dark);
+  padding: 30px;
+  min-height: 100%;
+}
+
+.roadmap-page .hub-header {
+  margin-bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.roadmap-page .hub-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.roadmap-page .hub-header p {
+  color: var(--text-medium);
+  font-size: 1.1rem;
+}
+
+.roadmap-page .roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+  animation: roadmapFadeIn 0.5s ease-out;
+}
+
+.roadmap-page .role-roadmap-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  padding: 20px;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  position: relative;
+  min-height: 220px;
+}
+
+.roadmap-page .role-roadmap-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--gold);
+  box-shadow: 0 8px 25px rgba(216, 196, 182, 0.15);
+}
+
+.roadmap-page .role-icon {
+  width: 50px;
+  height: 50px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  color: var(--gold-dark);
+  transition: all 0.3s;
+}
+
+.roadmap-page .role-roadmap-card:hover .role-icon {
+  color: var(--navy);
+  transform: scale(1.1);
+}
+
+.roadmap-page .role-info h3 {
+  font-size: 1.1rem;
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+.roadmap-page .role-info p {
+  font-size: 0.8rem;
+  color: var(--text-medium);
+  line-height: 1.4;
+}
+
+.roadmap-page .view-cta {
+  margin-top: auto;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--navy);
+  padding: 5px 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+}
+
+.roadmap-page .role-roadmap-card:hover .view-cta {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.roadmap-page .detailed-view {
+  animation: roadmapSlideIn 0.4s ease-out;
+}
+
+.roadmap-page .back-btn {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  color: var(--text-medium);
+  font-weight: 800;
+  cursor: pointer;
+  margin-bottom: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.75rem;
+  padding: 8px 18px;
+  border-radius: 50px;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.roadmap-page .back-btn:hover {
+  border-color: var(--navy);
+  color: var(--navy);
+  background: var(--cream-dark);
+  transform: translateX(-3px);
+}
+
+.roadmap-page .roadmap-container {
+  max-width: 800px;
+  position: relative;
+  padding-left: 60px;
+  margin-top: 40px;
+}
+
+.roadmap-page .roadmap-container::before {
+  content: '';
+  position: absolute;
+  left: 29px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--gold), var(--border-color));
+  border-radius: 10px;
+}
+
+.roadmap-page .roadmap-step {
+  position: relative;
+  margin-bottom: 40px;
+  background: #fff;
+  padding: 25px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  transition: all 0.3s;
+}
+
+.roadmap-page .roadmap-step:last-child {
+  margin-bottom: 0;
+}
+
+.roadmap-page .step-node {
+  position: absolute;
+  left: -40px;
+  top: 25px;
+  width: 20px;
+  height: 20px;
+  background: var(--gold);
+  border: 4px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--gold-dark);
+  z-index: 2;
+}
+
+.roadmap-page .step-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--cream-dark);
+  color: var(--gold-dark);
+  border-radius: 50px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.roadmap-page .step-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.roadmap-page .step-desc {
+  color: var(--text-medium);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.roadmap-page .roadmap-header p {
+  color: var(--text-medium);
+}
+
+.roadmap-page .roadmap-header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  margin-top: 4px;
+}
+
+@keyframes roadmapFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes roadmapSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

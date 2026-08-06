@@ -1,0 +1,14 @@
+.resume-page {
+  position: relative;
+  min-height: 60vh;
+  width: 100%;
+}
+
+.resume-page .cs {
+  width: 500px;
+  max-width: 90%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}

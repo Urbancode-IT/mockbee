@@ -1,0 +1,72 @@
+/* User menu only — navbar chrome comes from styles/style.css + logo inline styles */
+
+.user-nav-wrap {
+  display: block;
+  position: relative;
+}
+
+.user-avatar-btn {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: var(--gold-dark, #d8c4b6);
+  color: var(--navy-dark, #1a2535);
+  font-weight: 800;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid var(--cream-bg, #fdfaf3);
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.user-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 22px);
+  right: -40px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  min-width: 160px;
+  overflow: hidden;
+  z-index: 1001;
+}
+
+.user-dropdown a,
+.user-dropdown__logout {
+  display: block;
+  width: 100%;
+  padding: 12px 18px;
+  color: #1a2535;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.user-dropdown a {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.user-dropdown__logout {
+  color: #dc3545;
+}
+
+.user-dropdown a:hover,
+.user-dropdown__logout:hover {
+  background: #f8f5f2;
+}
