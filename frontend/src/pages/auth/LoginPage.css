@@ -99,6 +99,23 @@
   box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.15);
 }
 
+/* Password field must match email — block interview.css .input-wrapper leak */
+.login-section .input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 0;
+}
+
+.login-section .input-wrapper .form-input {
+  padding-right: 44px;
+}
+
 .reset-message {
   display: none;
   color: green;

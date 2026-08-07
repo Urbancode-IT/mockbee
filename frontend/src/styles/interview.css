@@ -413,7 +413,7 @@ body::after {
     margin: 0 auto;
 }
 
-.input-wrapper {
+.input-area .input-wrapper {
     background: var(--white);
     padding: 6px 10px 6px 25px;
     border-radius: 60px;
@@ -775,7 +775,7 @@ body::after {
     background: linear-gradient(to top, #000 80%, transparent);
 }
 
-.mode-high-intensity .input-wrapper {
+.mode-high-intensity .input-area .input-wrapper {
     background: #111;
     border: 2px solid var(--gold);
     box-shadow: 0 0 30px rgba(255, 193, 7, 0.1);
