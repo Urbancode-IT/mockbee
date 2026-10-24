@@ -3,15 +3,9 @@
   --gold: #d8c4b6;
   --navy: #1a1a1a;
   font-family: Satoshi, sans-serif;
-  background: #ffffff;
-  padding: 20px 30px;
+  background: transparent;
+  padding: 0;
   color: #1a1a1a;
-}
-
-.achievements-page h2 {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.6rem;
-  margin-bottom: 20px;
 }
 
 .achievements-page .badge-grid {
@@ -19,7 +13,7 @@
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 15px;
   width: 100%;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .achievements-page .badge-card {

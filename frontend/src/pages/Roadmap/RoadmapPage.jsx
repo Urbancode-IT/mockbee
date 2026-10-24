@@ -171,7 +171,8 @@ export default function RoadmapPage() {
   const showDetails = (data) => {
     logActivity(`Viewed ${data.role} Roadmap`)
     setSelected(data)
-    window.scrollTo(0, 0)
+    const outlet = document.querySelector('.dashboard-outlet')
+    if (outlet) outlet.scrollTop = 0
   }
 
   if (selected) {
@@ -183,7 +184,7 @@ export default function RoadmapPage() {
           </button>
           <div className="roadmap-header">
             <p>Growth Path</p>
-            <h1>{selected.role} Roadmap</h1>
+            <h2>{selected.role} Roadmap</h2>
           </div>
           <div className="roadmap-container">
             {selected.steps.map((step) => (
@@ -202,12 +203,6 @@ export default function RoadmapPage() {
 
   return (
     <div className="roadmap-page">
-      <div className="hub-header">
-        <div>
-          <p>Career Roadmap Directory</p>
-          <h1>Explore Your Path</h1>
-        </div>
-      </div>
       <div className="roadmap-grid">
         {ROADMAP_DATA.map((data) => (
           <div

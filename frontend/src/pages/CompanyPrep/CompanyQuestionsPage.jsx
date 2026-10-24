@@ -106,9 +106,6 @@ export default function CompanyQuestionsPage() {
 
         <div className="header-flex">
           <div>
-            <h1>
-              {topicParam ? `${company} ${topicParam} Questions` : `${company} Questions`}
-            </h1>
             <p className="header-subtitle">
               Previous interview questions grouped by topic for focused review.
             </p>

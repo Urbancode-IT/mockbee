@@ -64,8 +64,7 @@ export default function CompanyTopicsPage() {
       <Link to="/dashboard/company-prep" className="back-btn">
         <i className="fas fa-arrow-left" /> Back to Companies
       </Link>
-      <h2>{company} Questions</h2>
-      <p>Select a topic to view previous interview questions.</p>
+      <p className="page-lead">Select a topic to view previous interview questions.</p>
 
       <div className="topics-grid">
         {loading && <p>Loading topics...</p>}

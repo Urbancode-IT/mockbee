@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
-import { KEYS, getItem, setItem, getJSON } from '../../utils/storage'
+import { KEYS, getItem, getJSON } from '../../utils/storage'
 import '../../styles/dashboard.css'
 
 const LOGO = '/images/ChatGPT%20Image%20Apr%209,%202026,%2011_20_50%20AM.png'
@@ -24,6 +25,56 @@ const NAV_ITEMS = [
   ]},
 ]
 
+const PAGE_META = {
+  '/dashboard/roles': { title: 'Pick Your Role', sub: 'Choose a track and start practicing' },
+  '/dashboard/resume': { title: 'Resume Builder', sub: 'Build and polish your resume' },
+  '/dashboard/reports': { title: 'Reports & AI Feedback', sub: 'Review your interview performance' },
+  '/dashboard/practice': { title: 'Quick Practice', sub: 'Short drills to stay sharp' },
+  '/dashboard/company-prep': { title: 'Company Prep', sub: 'Prepare for target companies' },
+  '/dashboard/excel-interview': { title: 'Excel AI Interview', sub: 'Upload questions and run a voice interview' },
+  '/dashboard/coding-interview': { title: 'Coding AI Interview', sub: 'Upload a sheet and share a candidate link' },
+  '/dashboard/subscription': { title: 'My Subscription', sub: 'Manage your MockBee plan' },
+  '/dashboard/achievements': { title: 'Achievements', sub: 'Badges and milestones you earned' },
+  '/dashboard/settings': { title: 'Settings', sub: 'Account preferences' },
+  '/dashboard/roadmap': { title: 'Career Roadmaps', sub: 'Skill paths for your target role' },
+  '/dashboard/payment': { title: 'Payment', sub: 'Complete your membership purchase' },
+  '/dashboard/admin': { title: 'Admin Dashboard', sub: 'Interviews, question banks, users & reports — one module' },
+}
+
+function resolvePageMeta(pathname) {
+  if (PAGE_META[pathname]) return PAGE_META[pathname]
+
+  const practiceMatch = pathname.match(/^\/dashboard\/practice\/([^/]+)/)
+  if (practiceMatch) {
+    const labels = {
+      '5-min': { title: '5-Minute Drill', sub: 'High-intensity technical sprint' },
+      '1-q': { title: '1-Question Deep Dive', sub: 'One deep architectural task' },
+      rapid: { title: 'Rapid Revision', sub: 'Fast concept checks' },
+      warmup: { title: 'Warm-up Mode', sub: 'Ease in with fundamentals' },
+    }
+    return labels[practiceMatch[1]] || { title: 'Practice Mode', sub: 'Start your drill' }
+  }
+
+  const companyQuestions = pathname.match(/^\/dashboard\/company-prep\/([^/]+)\/questions/)
+  if (companyQuestions) {
+    return {
+      title: `${decodeURIComponent(companyQuestions[1])} Questions`,
+      sub: 'Review previous interview questions by topic',
+    }
+  }
+
+  const companyTopics = pathname.match(/^\/dashboard\/company-prep\/([^/]+)/)
+  if (companyTopics) {
+    return {
+      title: `${decodeURIComponent(companyTopics[1])} Prep`,
+      sub: 'Pick a topic to review questions',
+    }
+  }
+
+  const match = Object.keys(PAGE_META).find((key) => pathname.startsWith(`${key}/`))
+  return match ? PAGE_META[match] : null
+}
+
 function planLabel(user) {
   if (user?.isStudent || user?.role === 'STUDENT') return { text: 'STUDENT', btn: 'Student Access', tone: 'student' }
   if (!user?.subscribed) return { text: 'FREE PLAN', btn: 'Join MockB Membership', tone: 'free' }
@@ -37,17 +88,24 @@ export default function DashboardLayout() {
   const { user, displayName, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsed, setCollapsed] = useState(() => getItem(KEYS.sidebarCollapsed) === 'true')
   const plan = useMemo(() => planLabel(user), [user])
   const isOverview = location.pathname === '/dashboard' || location.pathname === '/dashboard/'
+  const pageMeta = resolvePageMeta(location.pathname)
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/login', { replace: true })
   }, [isAuthenticated, navigate])
 
   useEffect(() => {
-    setItem(KEYS.sidebarCollapsed, collapsed ? 'true' : 'false')
-  }, [collapsed])
+    document.documentElement.classList.add('dashboard-mode')
+    document.body.classList.add('dashboard-mode')
+    return () => {
+      document.documentElement.classList.remove('dashboard-mode')
+      document.body.classList.remove('dashboard-mode')
+    }
+  }, [])
+
+  const navItems = NAV_ITEMS
 
   const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -66,11 +124,11 @@ export default function DashboardLayout() {
 
   const handleSubClick = () => {
     if (user?.isStudent || user?.role === 'STUDENT') {
-      alert('Your student account has access enabled by the admin.')
+      toast.info('Your student account has access enabled by the admin.')
       return
     }
     if (user?.subscribed) {
-      alert('You are already a Pro Member! Enjoy all premium benefits.')
+      toast.success('You are already a Pro Member! Enjoy all premium benefits.')
       return
     }
     navigate('/dashboard/subscription')
@@ -80,7 +138,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="dashboard-layout">
-      <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
+      <aside className="sidebar" aria-label="Dashboard navigation">
         <div className="sidebar-header">
           <img
             src={LOGO}
@@ -89,18 +147,10 @@ export default function DashboardLayout() {
             onClick={() => navigate('/')}
             style={{ cursor: 'pointer' }}
           />
-          <button
-            type="button"
-            id="sidebar-toggle"
-            className="sidebar-toggle-btn"
-            onClick={() => setCollapsed((v) => !v)}
-          >
-            <i className="fas fa-bars" />
-          </button>
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((group) => (
+          {navItems.map((group) => (
             <div key={group.section}>
               <div className="nav-section">{group.section}</div>
               <ul className="nav-list">
@@ -110,6 +160,7 @@ export default function DashboardLayout() {
                       to={item.to}
                       end={item.end}
                       className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                      title={item.label}
                     >
                       <i className={`fas ${item.icon}`} /> <span>{item.label}</span>
                     </NavLink>
@@ -128,7 +179,7 @@ export default function DashboardLayout() {
               <p className={`user-plan-mini plan-${plan.tone}`}>{plan.text}</p>
             </div>
           </div>
-          <button type="button" className="btn-logout" onClick={handleLogout}>
+          <button type="button" className="btn-logout" onClick={handleLogout} title="Logout">
             <i className="fas fa-sign-out-alt" />
           </button>
         </div>
@@ -137,10 +188,19 @@ export default function DashboardLayout() {
       <main className="main-content">
         <header className="dashboard-header">
           <div className="welcome-text">
-            <h1>
-              Welcome back, <span className="accent">{displayName}</span>
-            </h1>
-            <p>Ready to level up your career today?</p>
+            {isOverview || !pageMeta ? (
+              <>
+                <h1>
+                  Welcome back, <span className="accent">{displayName}</span>
+                </h1>
+                <p>Ready to level up your career today?</p>
+              </>
+            ) : (
+              <>
+                <h1>{pageMeta.title}</h1>
+                <p>{pageMeta.sub}</p>
+              </>
+            )}
           </div>
           <div className="header-actions">
             <div className="home-nav-icon" onClick={() => navigate('/')} title="go back to home">

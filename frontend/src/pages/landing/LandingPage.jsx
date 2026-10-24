@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import lottie from 'lottie-web'
 import Navbar from '../../components/layout/Navbar'
 import './LandingPage.css'
@@ -294,7 +295,7 @@ export default function LandingPage() {
   const submitRoleRequest = () => {
     const roleName = customRole.trim()
     if (!roleName) {
-      alert('Please enter a role name!')
+      toast.error('Please enter a role name!')
       return
     }
     try {
@@ -655,8 +656,8 @@ export default function LandingPage() {
             <span className="section-header-compact__line" />
           </div>
           <p className="roles-section__subtitle">
-            Choose from 16+ specialised IT roles and get grilled by our AI on exactly what your interviewers will
-            ask.
+            Free MockBee practice — pick a role and face <strong>5 Gemini questions</strong> with our bee interviewer.
+            Full panels use questions from Admin Question Banks.
           </p>
 
           <div className="roles-filters">
@@ -694,8 +695,11 @@ export default function LandingPage() {
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>
-                <Link to={`/interview?role=${encodeURIComponent(role.title)}`} className="role-card__btn">
-                  Start Mock &rarr;
+                <Link
+                  to={`/interview?role=${encodeURIComponent(role.title)}&mode=bee`}
+                  className="role-card__btn"
+                >
+                  Start Bee Mock (5Q) &rarr;
                 </Link>
               </div>
             ))}

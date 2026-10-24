@@ -1,795 +1,800 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { apiFetch } from '../../config/api'
 import { useAuth } from '../../context/AuthContext'
 import { KEYS, getItem, getJSON, setJSON, setItem } from '../../utils/storage'
+import { speakNatural, stopNaturalSpeech, unlockSpeechAudio } from '../../utils/naturalSpeech'
+import { speakHuman, stopHumanVoice, unlockHumanVoice } from '../../utils/humanVoice'
 import '../../styles/interview.css'
 
-const PHASES = [
-  'self_intro',
-  'projects_skills',
-  'technical',
-  'optimization',
-  'behavioural',
-  'hr_logistics',
-]
+const BEE_IMG = '/images/file_0000000030c47208a129217cc981f4d6.png'
 
-const PHASE_LABELS = {
-  self_intro: 'Phase 1 — Self Introduction',
-  projects_skills: 'Phase 2 — Projects & Skills',
-  technical: 'Phase 3 — Technical Questions',
-  optimization: 'Phase 4 — Optimization & Problem Solving',
-  behavioural: 'Phase 5 — Behavioural Questions',
-  hr_logistics: 'Phase 6 — HR & Logistics',
+const PHASES = ['self_intro', 'projects_skills', 'technical', 'optimization', 'behavioural', 'hr_logistics']
+
+const PHASE_META = {
+  self_intro: { label: 'Self Introduction', short: 'Introduction', desc: 'Background, motivation and career summary', icon: 'fa-user' },
+  projects_skills: { label: 'Projects & Skills', short: 'Projects', desc: 'Key projects, ownership and technical skills', icon: 'fa-briefcase' },
+  technical: { label: 'Technical Round', short: 'Technical', desc: 'Core concepts and role-specific depth', icon: 'fa-code' },
+  optimization: { label: 'Problem Solving', short: 'Problem Solving', desc: 'Optimisation, trade-offs and edge cases', icon: 'fa-diagram-project' },
+  behavioural: { label: 'Behavioural Round', short: 'Behavioural', desc: 'Teamwork, conflict and STAR-based scenarios', icon: 'fa-people-group' },
+  hr_logistics: { label: 'HR & Closing', short: 'HR & Closing', desc: 'Expectations, availability and next steps', icon: 'fa-handshake' },
 }
 
-const PHASE_Q_TARGETS = {
-  self_intro: 2,
-  projects_skills: 3,
-  technical: 4,
-  optimization: 3,
-  behavioural: 5,
-  hr_logistics: 5,
-}
+const PHASE_Q_TARGETS = { self_intro: 2, projects_skills: 3, technical: 4, optimization: 3, behavioural: 5, hr_logistics: 5 }
+const FULL_PANEL_QUESTIONS = Object.values(PHASE_Q_TARGETS).reduce((a, b) => a + b, 0)
+/** Free MockBee / quick side — paid plans unlock the full MNC panel. */
+const QUICK_Q_TARGETS = { bee: 5, '5-min': 5, rapid: 5, warmup: 3, '1-q': 1 }
+const QUICK_MODES = Object.keys(QUICK_Q_TARGETS)
+const LEVELS = ['Fresher', 'Mid-level', 'Senior']
+const INTERVIEWER = { name: 'MockBee Interviewer', title: 'Practice panel', initials: 'MB' }
 
-const TOTAL_QUESTIONS = Object.values(PHASE_Q_TARGETS).reduce((a, b) => a + b, 0)
-
-const ROLE_ICON_MAPPING = {
-  Python: 'fab fa-python',
-  Frontend: 'fas fa-code',
-  Backend: 'fas fa-server',
-  ML: 'fas fa-brain',
-  'Data Scientist': 'fas fa-chart-pie',
-  Cloud: 'fas fa-cloud',
-  DevOps: 'fas fa-infinity',
-  Cybersecurity: 'fas fa-user-shield',
-  Network: 'fas fa-network-wired',
-  'System Architect': 'fas fa-sitemap',
-  QA: 'fas fa-vial',
-  Mobile: 'fas fa-mobile-screen-button',
-  Testing: 'fas fa-vial',
-  AWS: 'fab fa-aws',
-  Communication: 'fas fa-comments',
-}
-
-const MASCOT = '/images/ChatGPT%20Image%20Mar%2030,%202026,%2010_43_13%20AM.png'
-const QUICK_MODES = ['1-q', '5-min', 'rapid', 'warmup']
+/** Survive React Strict Mode remounts — prevents double start / two overlapping voices. */
+let beeBootLock = false
+let speakQueue = Promise.resolve()
 
 function formatBold(text) {
-  const parts = String(text || '').split(/(\*\*.*?\*\*)/g)
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>
-    }
-    return part
-  })
-}
-
-function roleIcon(roleName) {
-  for (const [key, icon] of Object.entries(ROLE_ICON_MAPPING)) {
-    if (roleName.toLowerCase().includes(key.toLowerCase())) return icon
-  }
-  return 'fas fa-globe'
-}
-
-function modeTitles(mode, roleName) {
-  if (mode === '5-min') return { title: '5-Minute Drill', badge: `${roleName} Session` }
-  if (mode === '1-q') return { title: '1-Question Deep Dive', badge: `${roleName} Expert Task` }
-  if (mode === 'rapid') return { title: 'Rapid Revision', badge: `${roleName} Prep` }
-  if (mode === 'warmup') return { title: 'Interview Warm-up', badge: `${roleName} Mode` }
-  return { title: roleName, badge: 'AI Mock Interview' }
-}
-
-function speakText(text, muted) {
-  if (!('speechSynthesis' in window) || muted) return
-  const clean = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\[PHASE_COMPLETE\]/g, '')
-    .replace(/\[INTERVIEW_COMPLETE\]/g, '')
-    .replace(/Q\d+:/g, '')
-    .trim()
-  if (!clean) return
-  const utterance = new SpeechSynthesisUtterance(clean)
-  utterance.rate = 1
-  utterance.pitch = 1
-  utterance.volume = 0.9
-  utterance.lang = 'en-US'
-  const voices = window.speechSynthesis.getVoices()
-  const preferred = voices.find(
-    (v) => v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Natural'),
+  return String(text || '').split(/(\*\*.*?\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part,
   )
-  if (preferred) utterance.voice = preferred
-  window.speechSynthesis.speak(utterance)
 }
+function roleFaIcon(roleName) {
+  const r = String(roleName || '').toLowerCase()
+  if (r.includes('python')) return 'fab fa-python'
+  if (r.includes('frontend') || r.includes('react')) return 'fas fa-globe'
+  if (r.includes('backend') || r.includes('node')) return 'fas fa-cogs'
+  if (r.includes('data')) return 'fas fa-chart-bar'
+  if (r.includes('ml') || r.includes('machine')) return 'fas fa-brain'
+  if (r.includes('cloud') || r.includes('aws')) return 'fas fa-cloud'
+  if (r.includes('devops')) return 'fas fa-sync-alt'
+  if (r.includes('mobile')) return 'fas fa-mobile-alt'
+  if (r.includes('security') || r.includes('cyber')) return 'fas fa-shield-alt'
+  if (r.includes('qa') || r.includes('test')) return 'fas fa-flask'
+  return 'fas fa-briefcase'
+}
+function modeTitles(mode, roleName) {
+  if (mode === 'bee') return { title: `${roleName} · Bee Practice`, badge: 'Free · 5 questions' }
+  if (mode === '5-min') return { title: '5-Minute Drill', badge: `${roleName} · Sprint` }
+  if (mode === '1-q') return { title: '1-Question Deep Dive', badge: `${roleName} · Expert Task` }
+  if (mode === 'rapid') return { title: 'Rapid Revision', badge: `${roleName} · Prep` }
+  if (mode === 'warmup') return { title: 'Interview Warm-up', badge: `${roleName} · Warm-up` }
+  return { title: `${roleName} Interview`, badge: 'Full Panel · Paid' }
+}
+const fmtClock = (s) => `${String(Math.floor(Math.max(0, s) / 60)).padStart(2, '0')}:${String(Math.max(0, s) % 60).padStart(2, '0')}`
 
 export default function InterviewPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
-
-  const mode = searchParams.get('mode') || 'standard'
-  const roleName = searchParams.get('role') || 'System Architect'
+  const { user, displayName, isPro } = useAuth()
+  const roleName = searchParams.get('role') || getItem(KEYS.selectedRole) || 'System Architect'
+  // Explicit URL mode wins. Default for free users = bee (5Q). Paid default = full MNC.
+  const rawMode = searchParams.get('mode') || ''
+  const isPaid = !!isPro || !!user?.subscribed || !!user?.isStudent
+  const mode = rawMode || (isPaid ? 'standard' : 'bee')
   const { title, badge } = modeTitles(mode, roleName)
+  const isQuick = QUICK_MODES.includes(mode)
+  const totalQuestions = isQuick ? QUICK_Q_TARGETS[mode] : FULL_PANEL_QUESTIONS
+  const totalQuestionsRef = useRef(totalQuestions)
+  totalQuestionsRef.current = totalQuestions
+
+  // Bee needs one tap first (browser autoplay block) — arm → live.
+  const [stage, setStage] = useState(isQuick ? 'arm' : 'lobby') // arm | lobby | live | done
+  const [level, setLevel] = useState('Mid-level')
+  const [candidateName, setCandidateName] = useState(displayName || 'Candidate')
+  const [agreed, setAgreed] = useState(isQuick)
+  const [checks, setChecks] = useState({ mic: null, speaker: null, network: null, speech: null })
+  const [checking, setChecking] = useState(false)
+  const sessionId = useMemo(() => `MB-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, [])
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [questionCount, setQuestionCount] = useState(0)
+  const [currentPhase, setCurrentPhase] = useState(PHASES[0])
   const [awaitingAnswer, setAwaitingAnswer] = useState(false)
   const [aiProcessing, setAiProcessing] = useState(false)
   const [typing, setTyping] = useState(false)
   const [complete, setComplete] = useState(false)
-  const [showResults, setShowResults] = useState(false)
-  const [showDemoModal, setShowDemoModal] = useState(false)
   const [muted, setMuted] = useState(false)
   const [listening, setListening] = useState(false)
+  const [aiSpeaking, setAiSpeaking] = useState(false)
   const [timerLeft, setTimerLeft] = useState(null)
-  const [timerWarning, setTimerWarning] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const [confirmEnd, setConfirmEnd] = useState(false)
 
-  const chatRef = useRef(null)
-  const recognitionRef = useRef(null)
-  const startedRef = useRef(false)
-  const phaseIndexRef = useRef(0)
-  const questionsInPhaseRef = useRef(0)
-  const historyRef = useRef([])
-  const transcriptRef = useRef([])
-  const lastQuestionRef = useRef('')
-  const completeRef = useRef(false)
-  const qCountRef = useRef(0)
-  const mutedRef = useRef(false)
-  const inputBaselineRef = useRef('')
-
-  useEffect(() => {
-    mutedRef.current = muted
-  }, [muted])
-
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      if (chatRef.current) {
-        chatRef.current.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })
+  const chatRef = useRef(null); const recognitionRef = useRef(null); const startedRef = useRef(false)
+  const phaseIndexRef = useRef(0); const questionsInPhaseRef = useRef(0); const historyRef = useRef([])
+  const transcriptRef = useRef([]); const lastQuestionRef = useRef(''); const completeRef = useRef(false)
+  const qCountRef = useRef(0); const mutedRef = useRef(false); const inputBaselineRef = useRef(''); const levelRef = useRef(level)
+  levelRef.current = level
+  useEffect(() => { mutedRef.current = muted }, [muted])
+  useEffect(() => { if (displayName && !candidateName) setCandidateName(displayName) }, [displayName]) // eslint-disable-line
+  /** Prefer backend neural TTS (Edge/Gemini); fall back to browser neural voice if API fails. */
+  const speakAI = useCallback((text) => {
+    if (mutedRef.current) return Promise.resolve()
+    const run = async () => {
+      stopHumanVoice()
+      stopNaturalSpeech()
+      try { window.speechSynthesis?.cancel() } catch { /* ignore */ }
+      setAiSpeaking(true)
+      try {
+        const ok = await speakHuman(text, {
+          muted: mutedRef.current,
+          timeoutMs: 25000,
+          onStart: () => setAiSpeaking(true),
+        })
+        if (!ok && !mutedRef.current) {
+          await speakNatural(text, {
+            muted: mutedRef.current,
+            onStart: () => setAiSpeaking(true),
+          })
+        }
+      } finally {
+        setAiSpeaking(false)
       }
-    })
+    }
+    speakQueue = speakQueue.then(run, run)
+    return speakQueue
   }, [])
-
-  const pushMessage = useCallback(
-    (msg) => {
-      setMessages((prev) => [...prev, { id: `${Date.now()}-${Math.random()}`, ...msg }])
-      scrollToBottom()
-    },
-    [scrollToBottom],
-  )
+  const scrollToBottom = useCallback(() => requestAnimationFrame(() => chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })), [])
+  const pushMessage = useCallback((msg) => { setMessages((p) => [...p, { id: `${Date.now()}-${Math.random()}`, ...msg }]); scrollToBottom() }, [scrollToBottom])
 
   const finishInterview = useCallback(() => {
     if (completeRef.current) return
     completeRef.current = true
     setComplete(true)
     setAwaitingAnswer(false)
-    setTimeout(() => {
-      setShowResults(true)
-      const isStudent =
-        getItem(KEYS.role) === 'STUDENT' || getItem(KEYS.isStudent) === 'true'
-      if (!isStudent && !QUICK_MODES.includes(mode)) {
-        setTimeout(() => setShowDemoModal(true), 800)
+    stopHumanVoice()
+    stopNaturalSpeech()
+    setAiSpeaking(false)
+    beeBootLock = false
+    // Free bee: the moment 5Q are done, ask for subscription (no report / no delay).
+    if (isQuick && !isPaid) {
+      const sessionData = {
+        id: String(Date.now()),
+        sessionId,
+        role: roleName,
+        level,
+        transcript: transcriptRef.current,
+        conversationHistory: historyRef.current,
+        date: new Date().toLocaleDateString(),
+        totalQuestions: qCountRef.current,
+        mode,
+        isQuick: true,
+        isPro: false,
       }
-    }, 1200)
-  }, [mode])
+      setItem(KEYS.recentInterview, JSON.stringify(sessionData))
+      const history = getJSON(KEYS.interviews, [])
+      history.push(sessionData)
+      setJSON(KEYS.interviews, history)
+      navigate('/dashboard/subscription', {
+        replace: true,
+        state: { fromBee: true, role: roleName, questions: qCountRef.current },
+      })
+      return
+    }
+    setStage('done')
+  }, [isPaid, isQuick, level, mode, navigate, roleName, sessionId])
 
   const requestAIQuestion = useCallback(async () => {
     setTyping(true)
-    const currentPhase = PHASES[phaseIndexRef.current]
-
+    const phase = isQuick ? 'technical' : PHASES[phaseIndexRef.current]
+    if (!isQuick) setCurrentPhase(phase)
     try {
       const { ok, body, status } = await apiFetch('/api/interview/chat', {
         method: 'POST',
         body: JSON.stringify({
           role: roleName,
-          level: 'Mid-level',
+          level: levelRef.current,
           history: historyRef.current,
-          phase: currentPhase,
+          phase,
           questions_in_phase: questionsInPhaseRef.current,
+          mode,
         }),
       })
-
       setTyping(false)
       if (!ok) throw new Error(body.detail || `HTTP ${status}`)
-
       const reply = body.reply
       if (!reply) throw new Error('No reply from AI')
-
       historyRef.current = [...historyRef.current, { role: 'assistant', content: reply }]
-
       if (reply.includes('[INTERVIEW_COMPLETE]')) {
-        const cleanReply = reply.replace('[INTERVIEW_COMPLETE]', '').trim()
-        pushMessage({ type: 'ai', text: cleanReply })
-        speakText(cleanReply, mutedRef.current)
-        finishInterview()
-        return
+        const clean = reply.replace('[INTERVIEW_COMPLETE]', '').trim()
+        if (clean) { pushMessage({ type: 'ai', text: clean }); speakAI(clean) }
+        finishInterview(); return
       }
-
-      if (reply.includes('[PHASE_COMPLETE]')) {
-        const cleanReply = reply.replace('[PHASE_COMPLETE]', '').trim()
-        pushMessage({ type: 'ai', text: cleanReply })
-        speakText(cleanReply, mutedRef.current)
-        phaseIndexRef.current += 1
-        questionsInPhaseRef.current = 0
-        historyRef.current = [
-          ...historyRef.current,
-          {
-            role: 'user',
-            content: 'I am ready. Please proceed to the next phase and ask the first question.',
-          },
-        ]
+      if (!isQuick && reply.includes('[PHASE_COMPLETE]')) {
+        const clean = reply.replace('[PHASE_COMPLETE]', '').trim()
+        if (clean) pushMessage({ type: 'ai', text: clean })
+        phaseIndexRef.current += 1; questionsInPhaseRef.current = 0
         if (phaseIndexRef.current < PHASES.length) {
-          setTimeout(() => requestAIQuestion(), 1500)
-        } else {
-          finishInterview()
-        }
+          const next = PHASES[phaseIndexRef.current]; setCurrentPhase(next)
+          pushMessage({ type: 'phase', text: PHASE_META[next].label, desc: PHASE_META[next].desc })
+          historyRef.current = [...historyRef.current, { role: 'user', content: 'I am ready. Please proceed to the next phase and ask the first question.' }]
+          setTimeout(() => requestAIQuestion(), 1200)
+        } else finishInterview()
         return
       }
-
-      qCountRef.current += 1
-      questionsInPhaseRef.current += 1
-      setQuestionCount(qCountRef.current)
-      lastQuestionRef.current = reply
-      pushMessage({ type: 'ai', text: `**Q${qCountRef.current}:** ${reply}` })
-      speakText(reply, mutedRef.current)
-      setAwaitingAnswer(true)
-    } catch (err) {
-      setTyping(false)
-      console.error('AI Error:', err)
-      let errorMsg =
-        '⚠️ The AI server is starting up. Please wait ~30 seconds and click **Retry** below.'
-      if (err.message?.includes('429')) {
-        errorMsg = '⚠️ AI API Quota Exceeded. Please try again later or check your API key limit.'
-      } else if (
-        err.message &&
-        err.message !== 'API responded with an error' &&
-        err.message !== 'Failed to fetch'
-      ) {
-        errorMsg = `⚠️ Error: ${err.message}. Please click **Retry** below.`
+      if (isQuick && qCountRef.current >= totalQuestionsRef.current) {
+        finishInterview(); return
       }
-      pushMessage({ type: 'ai', text: errorMsg, retry: true })
+      qCountRef.current += 1; questionsInPhaseRef.current += 1; setQuestionCount(qCountRef.current)
+      lastQuestionRef.current = reply
+      pushMessage({ type: 'ai', text: reply, qNum: qCountRef.current })
+      // Speak the question fully before opening the mic / answer box.
+      await speakAI(reply)
+      if (!completeRef.current) setAwaitingAnswer(true)
+    } catch (err) {
+      setTyping(false); console.error('AI Error:', err)
+      const msg = err.message?.includes('429') ? 'The interview service is busy (quota limit). Please wait a moment and retry.' : 'We could not reach the interview server. It may be waking up — please wait ~30 seconds and retry.'
+      pushMessage({ type: 'ai', text: msg, retry: true })
     }
-  }, [finishInterview, pushMessage, roleName])
+  }, [finishInterview, isQuick, mode, pushMessage, roleName, speakAI])
 
   const handleSubmit = useCallback(async () => {
     if (completeRef.current || !awaitingAnswer || aiProcessing) return
-    const message = input.trim()
-    if (!message) return
-
-    if (listening && recognitionRef.current) {
-      setListening(false)
-      try {
-        recognitionRef.current.stop()
-      } catch {
-        /* ignore */
-      }
-    }
-
-    setAwaitingAnswer(false)
-    setAiProcessing(true)
-    setInput('')
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-
+    const message = input.trim(); if (!message) return
+    if (listening && recognitionRef.current) { setListening(false); try { recognitionRef.current.stop() } catch { /* noop */ } }
+    setAwaitingAnswer(false); setAiProcessing(true); setInput(''); stopHumanVoice(); stopNaturalSpeech(); setAiSpeaking(false)
     pushMessage({ type: 'user', text: message })
     historyRef.current = [...historyRef.current, { role: 'user', content: message }]
-    transcriptRef.current = [
-      ...transcriptRef.current,
-      {
-        question:
-          lastQuestionRef.current ||
-          `[${PHASE_LABELS[PHASES[phaseIndexRef.current]]}]`,
-        answer: message,
-        phase: PHASES[phaseIndexRef.current],
-      },
-    ]
+    const phaseKey = isQuick ? 'technical' : PHASES[phaseIndexRef.current]
+    transcriptRef.current = [...transcriptRef.current, { question: lastQuestionRef.current || (isQuick ? 'Bee practice' : PHASE_META[phaseKey].label), answer: message, phase: phaseKey }]
+
+    // Hard cap: after the Nth answer on free bee — go ask subscription immediately.
+    if (isQuick && qCountRef.current >= totalQuestionsRef.current) {
+      setAiProcessing(false)
+      finishInterview()
+      return
+    }
 
     setTyping(true)
-    const currentPhase = PHASES[phaseIndexRef.current]
-
     try {
       const { ok, body, status } = await apiFetch('/api/interview/chat', {
         method: 'POST',
         body: JSON.stringify({
           role: roleName,
-          level: 'Mid-level',
+          level: levelRef.current,
           history: historyRef.current,
-          phase: currentPhase,
+          phase: phaseKey,
           questions_in_phase: questionsInPhaseRef.current,
+          mode,
         }),
       })
-
-      setTyping(false)
-      setAiProcessing(false)
+      setTyping(false); setAiProcessing(false)
       if (!ok) throw new Error(body.detail || `HTTP ${status}`)
-
-      const reply = body.reply
-      if (!reply) throw new Error('No reply from AI')
-
+      const reply = body.reply; if (!reply) throw new Error('No reply from AI')
       historyRef.current = [...historyRef.current, { role: 'assistant', content: reply }]
-
       if (reply.includes('[INTERVIEW_COMPLETE]')) {
-        const cleanReply = reply.replace('[INTERVIEW_COMPLETE]', '').trim()
-        pushMessage({ type: 'ai', text: cleanReply, feedback: true })
-        speakText(cleanReply, mutedRef.current)
-        finishInterview()
-        return
+        const clean = reply.replace('[INTERVIEW_COMPLETE]', '').trim()
+        if (clean) { pushMessage({ type: 'ai', text: clean }); speakAI(clean) }
+        finishInterview(); return
       }
-
-      if (reply.includes('[PHASE_COMPLETE]')) {
-        const cleanReply = reply.replace('[PHASE_COMPLETE]', '').trim()
-        pushMessage({ type: 'ai', text: cleanReply, feedback: true })
-        speakText(cleanReply, mutedRef.current)
-        phaseIndexRef.current += 1
-        questionsInPhaseRef.current = 0
-        historyRef.current = [
-          ...historyRef.current,
-          {
-            role: 'user',
-            content: 'I am ready. Please proceed to the next phase and ask the first question.',
-          },
-        ]
+      if (!isQuick && reply.includes('[PHASE_COMPLETE]')) {
+        const clean = reply.replace('[PHASE_COMPLETE]', '').trim()
+        if (clean) pushMessage({ type: 'ai', text: clean, feedback: true })
+        phaseIndexRef.current += 1; questionsInPhaseRef.current = 0
         if (phaseIndexRef.current < PHASES.length) {
-          setTimeout(() => requestAIQuestion(), 1500)
-        } else {
-          finishInterview()
-        }
+          const next = PHASES[phaseIndexRef.current]; setCurrentPhase(next)
+          pushMessage({ type: 'phase', text: PHASE_META[next].label, desc: PHASE_META[next].desc })
+          historyRef.current = [...historyRef.current, { role: 'user', content: 'I am ready. Please proceed to the next phase and ask the first question.' }]
+          setTimeout(() => requestAIQuestion(), 1200)
+        } else finishInterview()
         return
       }
-
-      qCountRef.current += 1
-      questionsInPhaseRef.current += 1
-      setQuestionCount(qCountRef.current)
-      lastQuestionRef.current = reply
-      pushMessage({ type: 'ai', text: reply, feedback: true, qNum: qCountRef.current })
-      speakText(reply, mutedRef.current)
-      setAwaitingAnswer(true)
-    } catch (err) {
-      setTyping(false)
-      setAiProcessing(false)
-      console.error('AI Error:', err)
-      let errorMsg =
-        '⚠️ Connection lost or server waking up. Please wait ~30 seconds and try submitting again.'
-      if (err.message?.includes('429')) {
-        errorMsg = '⚠️ AI API Quota Exceeded. Please try again later or check your API key limit.'
-      } else if (err.message && !err.message.includes('Failed to fetch')) {
-        errorMsg = `⚠️ Error: ${err.message}. Please try submitting again.`
+      if (isQuick && qCountRef.current >= totalQuestionsRef.current) {
+        finishInterview(); return
       }
-      pushMessage({ type: 'ai', text: errorMsg })
-      historyRef.current = historyRef.current.slice(0, -1)
-      transcriptRef.current = transcriptRef.current.slice(0, -1)
-      setMessages((prev) => {
-        const next = [...prev]
-        for (let i = next.length - 1; i >= 0; i--) {
-          if (next[i].type === 'user' && next[i].text === message) {
-            next.splice(i, 1)
-            break
-          }
-        }
-        return next
-      })
-      setInput(message)
-      setAwaitingAnswer(true)
+      qCountRef.current += 1; questionsInPhaseRef.current += 1; setQuestionCount(qCountRef.current)
+      lastQuestionRef.current = reply
+      pushMessage({ type: 'ai', text: reply, qNum: qCountRef.current })
+      await speakAI(reply)
+      if (!completeRef.current) setAwaitingAnswer(true)
+    } catch (err) {
+      setTyping(false); setAiProcessing(false); console.error('AI Error:', err)
+      toast.error('Connection lost. Your answer is restored — please submit again.')
+      historyRef.current = historyRef.current.slice(0, -1); transcriptRef.current = transcriptRef.current.slice(0, -1)
+      setMessages((p) => { const n = [...p]; for (let i = n.length - 1; i >= 0; i--) { if (n[i].type === 'user' && n[i].text === message) { n.splice(i, 1); break } } return n })
+      setInput(message); setAwaitingAnswer(true)
     }
-  }, [
-    aiProcessing,
-    awaitingAnswer,
-    finishInterview,
-    input,
-    listening,
-    pushMessage,
-    requestAIQuestion,
-    roleName,
-  ])
+  }, [aiProcessing, awaitingAnswer, finishInterview, input, isQuick, listening, mode, pushMessage, requestAIQuestion, roleName, speakAI])
 
   const saveAndNavigate = useCallback(() => {
-    const sessionData = {
-      id: String(Date.now()),
-      role: roleName,
-      transcript: transcriptRef.current,
-      conversationHistory: historyRef.current,
-      date: new Date().toLocaleDateString(),
-      totalQuestions: qCountRef.current,
-      mode,
-      isQuick: mode !== 'standard',
-      isPro: mode === 'standard',
-    }
-
+    const sessionData = { id: String(Date.now()), sessionId, role: roleName, level, transcript: transcriptRef.current, conversationHistory: historyRef.current, date: new Date().toLocaleDateString(), totalQuestions: qCountRef.current, mode, isQuick, isPro: mode === 'standard' }
     setItem(KEYS.recentInterview, JSON.stringify(sessionData))
-    const history = getJSON(KEYS.interviews, [])
-    history.push(sessionData)
-    setJSON(KEYS.interviews, history)
-
+    const history = getJSON(KEYS.interviews, []); history.push(sessionData); setJSON(KEYS.interviews, history)
     const email = getItem(KEYS.userEmail) || user?.email
-    if (email) {
-      apiFetch('/api/interview/save', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          role: sessionData.role,
-          date: sessionData.date,
-          score: null,
-          analysis: {},
-          transcript: sessionData.transcript,
-          conversationHistory: sessionData.conversationHistory,
-          totalQuestions: sessionData.totalQuestions,
-          mode: sessionData.mode,
-          session_id: sessionData.id,
-          isQuick: sessionData.isQuick,
-          isPro: sessionData.isPro,
-          topic: sessionData.role,
-        }),
-      }).catch((err) => console.error('Session draft save failed:', err))
+    if (email) apiFetch('/api/interview/save', { method: 'POST', body: JSON.stringify({ email, role: roleName, date: sessionData.date, score: null, analysis: {}, transcript: sessionData.transcript, conversationHistory: sessionData.conversationHistory, totalQuestions: sessionData.totalQuestions, mode, session_id: sessionData.id, isQuick, isPro: sessionData.isPro, topic: roleName }) }).catch(() => {})
+    // Bee practice: no report — send free users to subscribe
+    if (isQuick) {
+      navigate(isPaid ? '/dashboard/roles' : '/dashboard/subscription')
+      return
     }
+    navigate('/dashboard/reports?view=report')
+  }, [isPaid, isQuick, mode, navigate, roleName, user?.email, level, sessionId])
 
-    if (QUICK_MODES.includes(mode)) {
-      navigate('/reports/quick?view=report')
-    } else {
-      navigate('/dashboard/reports?view=report')
+  /* ---- Lobby: device checks (real MNC pre-flight) ---- */
+  const runChecks = async () => {
+    setChecking(true)
+    let mic = false
+    try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach((t) => t.stop()); mic = true } catch { mic = false }
+    await unlockHumanVoice()
+    const humanOk = await speakHuman('Hello. This is your interviewer voice check.', { muted: false })
+    const speaker = humanOk || 'speechSynthesis' in window
+    const speech = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    setChecks({ mic, speaker, network: navigator.onLine, speech })
+    setChecking(false)
+    if (mic && speaker) toast.success(humanOk ? 'System check complete — human interviewer voice ready.' : 'System check complete — you are ready.')
+    else toast.warning('Some checks failed. You can still continue and type your answers.')
+  }
+
+  const beginInterview = useCallback(async ({ skipGate = false } = {}) => {
+    const name = (candidateName || displayName || 'Candidate').trim()
+    if (!skipGate) {
+      if (!name) { toast.error('Please confirm your full name.'); return }
+      if (!agreed) { toast.error('Please accept the interview guidelines to continue.'); return }
     }
-  }, [mode, navigate, roleName, user?.email])
-
-  // Start interview once
-  useEffect(() => {
-    if (startedRef.current) return
+    if (startedRef.current || beeBootLock) return
     startedRef.current = true
-    pushMessage({
-      type: 'ai',
-      text: `Welcome to your **${roleName}** interview. I'm your AI interviewer for today. Let's begin!`,
-    })
-    historyRef.current = [
-      {
-        role: 'user',
-        content: 'I am ready to begin the interview. Please ask the first question.',
-      },
-    ]
-    const t = setTimeout(() => requestAIQuestion(), 1500)
-    return () => clearTimeout(t)
-  }, [pushMessage, requestAIQuestion, roleName])
+    beeBootLock = true
+    setCandidateName(name)
+    setStage('live')
+    // Must run inside the user click that started the interview.
+    const voiceOk = await unlockHumanVoice()
+    await unlockSpeechAudio()
+    if (!voiceOk) toast.message('Tap anywhere once if you cannot hear the interviewer.')
+    // Prime mic permission on the same tap so candidate mic can auto-on later.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((t) => t.stop())
+    } catch {
+      /* typing still works */
+    }
+    stopNaturalSpeech()
+    try { window.speechSynthesis?.cancel() } catch { /* ignore */ }
+    if (!isQuick) {
+      pushMessage({ type: 'phase', text: PHASE_META.self_intro.label, desc: PHASE_META.self_intro.desc })
+    }
+    const welcome = isQuick
+      ? `Welcome to your ${roleName} interview. I'm your AI interviewer for today. Let's begin!`
+      : `Hello ${name.split(' ')[0]}, welcome to your ${roleName} interview at MockBee. This will be a structured ${totalQuestions}-question panel across ${PHASES.length} rounds. Take a moment, answer clearly, and let's begin.`
+    pushMessage({ type: 'ai', text: welcome })
+    // Finish welcome audio first, then fetch + speak Q1 (same voice path).
+    speakQueue = Promise.resolve()
+    await speakAI(welcome)
+    if (completeRef.current) return
+    historyRef.current = [{ role: 'user', content: 'I am ready to begin the interview. Please ask the first question.' }]
+    await requestAIQuestion()
+  }, [agreed, candidateName, displayName, isQuick, pushMessage, requestAIQuestion, roleName, speakAI, totalQuestions])
 
-  // Countdown for timed modes
+
+  /* elapsed + countdown */
   useEffect(() => {
-    if (mode !== '5-min' && mode !== 'rapid') return undefined
-    setTimerLeft(5 * 60)
-    const id = setInterval(() => {
-      setTimerLeft((prev) => {
-        if (prev == null) return prev
-        if (prev <= 1) {
-          clearInterval(id)
-          if (!completeRef.current) {
-            alert("Time is up! Let's wrap up this session.")
-            finishInterview()
-          }
-          return 0
-        }
-        if (prev <= 61) setTimerWarning(true)
-        return prev - 1
-      })
-    }, 1000)
+    if (stage !== 'live') return undefined
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(id)
-  }, [finishInterview, mode])
-
-  // Voice recognition (simplified)
+  }, [stage])
   useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) return undefined
+    if (stage !== 'live' || (mode !== '5-min' && mode !== 'rapid')) return undefined
+    setTimerLeft(5 * 60)
+    const id = setInterval(() => setTimerLeft((p) => { if (p == null) return p; if (p <= 1) { clearInterval(id); toast.info("Time is up — let's wrap up."); finishInterview(); return 0 } return p - 1 }), 1000)
+    return () => clearInterval(id)
+  }, [finishInterview, mode, stage])
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
-    recognitionRef.current = recognition
+  useEffect(() => {
+    if (stage !== 'live' || complete) return undefined
+    const warn = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [stage, complete])
 
-    recognition.onresult = (event) => {
-      let interim = ''
-      let final = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
-        if (event.results[i].isFinal) final += `${transcript} `
-        else interim += transcript
-      }
-      if (final) inputBaselineRef.current += final
-      setInput(inputBaselineRef.current + interim)
-    }
+  /* speech recognition */
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) return undefined
+    const rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.lang = 'en-IN'; recognitionRef.current = rec
+    rec.onresult = (e) => { let interim = ''; let final = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) final += `${t} `; else interim += t } if (final) inputBaselineRef.current += final; setInput(inputBaselineRef.current + interim) }
+    rec.onend = () => setListening((was) => { if (was) { try { rec.start() } catch { /* noop */ } return was } })
+    rec.onerror = (e) => { if (e.error === 'not-allowed') toast.error('Microphone access denied. Allow mic permission or type your answer.'); if (e.error !== 'no-speech' && e.error !== 'aborted') setListening(false) }
+    return () => { try { rec.stop() } catch { /* noop */ } }
+  }, [])
 
-    recognition.onend = () => {
-      setListening((was) => {
-        if (was) {
-          try {
-            recognition.start()
-          } catch {
-            /* ignore */
-          }
-          return true
-        }
-        return false
-      })
-    }
-
-    recognition.onerror = (event) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') return
-      if (event.error === 'not-allowed') {
-        alert('Microphone access was denied. Please allow microphone permissions.')
-      }
-      setListening(false)
-    }
-
-    return () => {
+  const startMic = useCallback(() => {
+    if (!recognitionRef.current || completeRef.current) return false
+    inputBaselineRef.current = inputBaselineRef.current && !String(inputBaselineRef.current).endsWith(' ')
+      ? `${inputBaselineRef.current} `
+      : (inputBaselineRef.current || '')
+    setListening(true)
+    try {
+      recognitionRef.current.start()
+      return true
+    } catch {
+      try { recognitionRef.current.stop() } catch { /* noop */ }
       try {
-        recognition.stop()
+        recognitionRef.current.start()
+        return true
       } catch {
-        /* ignore */
+        setListening(false)
+        return false
       }
     }
   }, [])
 
+  const stopMic = useCallback(() => {
+    setListening(false)
+    try { recognitionRef.current?.stop() } catch { /* noop */ }
+  }, [])
+
   const toggleMic = () => {
-    if (!awaitingAnswer || !recognitionRef.current) return
-    if (listening) {
-      setListening(false)
-      try {
-        recognitionRef.current.stop()
-      } catch {
-        /* ignore */
-      }
-    } else {
+    if (!recognitionRef.current) { toast.info('Voice input is not supported in this browser — please type your answer.'); return }
+    if (!awaitingAnswer) return
+    if (listening) stopMic()
+    else {
       inputBaselineRef.current = input && !input.endsWith(' ') ? `${input} ` : input
-      setListening(true)
-      try {
-        recognitionRef.current.start()
-      } catch (err) {
-        console.error(err)
-      }
+      startMic()
     }
   }
 
-  const toggleMute = () => {
-    setMuted((m) => {
-      if (!m && 'speechSynthesis' in window) window.speechSynthesis.cancel()
-      return !m
-    })
+  // After AI finishes speaking, auto-enable candidate mic.
+  useEffect(() => {
+    if (stage !== 'live' || complete || !awaitingAnswer || aiSpeaking || aiProcessing) {
+      if (listening && (aiSpeaking || !awaitingAnswer || aiProcessing)) stopMic()
+      return undefined
+    }
+    if (listening) return undefined
+    const t = setTimeout(() => { startMic() }, 280)
+    return () => clearTimeout(t)
+  }, [aiProcessing, aiSpeaking, awaitingAnswer, complete, listening, stage, startMic, stopMic])
+
+  const toggleMute = () => setMuted((m) => { if (!m) { stopHumanVoice(); stopNaturalSpeech(); setAiSpeaking(false) } return !m })
+
+  const progressPct = Math.min(questionCount, totalQuestions) / totalQuestions * 100
+  const phaseIdx = PHASES.indexOf(currentPhase)
+  const wordCount = input.trim() ? input.trim().split(/\s+/).length : 0
+  const checkRow = (ok, label, hint) => (
+    <div className="mnc-check"><span className={`mnc-check-dot ${ok === null ? '' : ok ? 'ok' : 'bad'}`}><i className={`fas ${ok === null ? 'fa-minus' : ok ? 'fa-check' : 'fa-triangle-exclamation'}`} /></span><div><strong>{label}</strong><small>{ok === null ? 'Not tested yet' : hint(ok)}</small></div></div>
+  )
+
+  /* ================= BEE ARM (tap unlocks human voice) ================= */
+  if (stage === 'arm') {
+    return (
+      <div className="interview-page mnc">
+        <header className="mnc-topbar">
+          <div className="mnc-brand"><span className="mnc-logo">M</span><div><strong>MockBee</strong><small>{badge}</small></div></div>
+          <div className="mnc-topbar-right">
+            <button type="button" className="mnc-ghost-btn" onClick={() => navigate('/dashboard/roles')}><i className="fas fa-arrow-left" /> Exit</button>
+          </div>
+        </header>
+        <div className="mnc-arm-gate">
+          <img src={BEE_IMG} alt="MockBee" className="mnc-arm-bee" draggable={false} />
+          <h1>{roleName}</h1>
+          <p>Bee practice · {totalQuestions} questions</p>
+          <button
+            type="button"
+            className="mnc-primary-btn mnc-arm-start"
+            onClick={() => beginInterview({ skipGate: true })}
+          >
+            Start
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const progressPct = Math.min(questionCount, TOTAL_QUESTIONS) / TOTAL_QUESTIONS * 100
-  const timerDisplay =
-    timerLeft != null
-      ? `${String(Math.floor(timerLeft / 60)).padStart(2, '0')}:${String(timerLeft % 60).padStart(2, '0')}`
-      : null
+  /* ================= LOBBY ================= */
+  if (stage === 'lobby') {
+    return (
+      <div className="interview-page mnc">
+        <header className="mnc-topbar">
+          <div className="mnc-brand"><span className="mnc-logo">M</span><div><strong>MockBee</strong><small>Talent Assessment Platform</small></div></div>
+          <div className="mnc-topbar-right"><span className="mnc-session-chip"><i className="fas fa-id-card" /> {sessionId}</span><button type="button" className="mnc-ghost-btn" onClick={() => navigate('/dashboard/roles')}><i className="fas fa-arrow-left" /> Exit</button></div>
+        </header>
+        <div className="mnc-lobby">
+          <section className="mnc-lobby-main">
+            <p className="mnc-eyebrow">Pre-interview lobby</p>
+            <h1>{title}</h1>
+            <p className="mnc-lede">
+              {isQuick
+                ? `Quick MockBee practice for ${roleName}: ${totalQuestions} questions from our AI bee interviewer. Confirm your details, run a quick check, and join.`
+                : 'You are about to begin a structured panel interview, conducted the way large product companies run their hiring rounds. Please review the format and complete your system check before joining.'}
+            </p>
+            <div className="mnc-meta-grid">
+              <div><small>Role</small><strong>{roleName}</strong></div>
+              <div><small>Format</small><strong>{isQuick ? `${totalQuestions} questions` : `${PHASES.length} rounds · ${totalQuestions} questions`}</strong></div>
+              <div><small>Estimated duration</small><strong>{isQuick ? (mode === '1-q' ? '~10 minutes' : '~8–12 minutes') : '25–35 minutes'}</strong></div>
+              <div><small>Interviewer</small><strong>{INTERVIEWER.name}</strong></div>
+            </div>
 
-  return (
-    <div className="interview-page">
-      <header className="interview-header">
-        <div className="header-left">
-          <button type="button" className="back-link" title="Go Back" onClick={() => navigate(-1)}>
+            {!isQuick && (
+              <>
+                <h2 className="mnc-h2">Interview structure</h2>
+                <ol className="mnc-agenda">
+                  {PHASES.map((p, i) => (<li key={p}><span className="mnc-agenda-num">{i + 1}</span><i className={`fas ${PHASE_META[p].icon}`} /><div><strong>{PHASE_META[p].label}</strong><small>{PHASE_META[p].desc} · {PHASE_Q_TARGETS[p]} questions</small></div></li>))}
+                </ol>
+              </>
+            )}
+
+            <h2 className="mnc-h2">Guidelines</h2>
+            <ul className="mnc-guidelines">
+              <li>Answer in your own words. Structured answers (situation → approach → result) score best.</li>
+              <li>You may answer by voice or by typing. Use <strong>Enter</strong> to submit, <strong>Shift + Enter</strong> for a new line.</li>
+              <li>Do not refresh or close this tab during the interview — progress will be lost.</li>
+              <li>This is a practice assessment. Your transcript is evaluated only for your report.</li>
+            </ul>
+            <label className="mnc-agree"><input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} /><span>I understand the format and will answer honestly without external assistance.</span></label>
+          </section>
+
+          <aside className="mnc-lobby-side">
+            <div className="mnc-card">
+              <h2 className="mnc-h2">Candidate details</h2>
+              <label className="mnc-field">Full name<input value={candidateName} onChange={(e) => setCandidateName(e.target.value)} placeholder="e.g. Priya Sharma" autoComplete="name" /></label>
+              <label className="mnc-field">Experience level
+                <div className="mnc-seg">{LEVELS.map((l) => (<button key={l} type="button" className={level === l ? 'active' : ''} onClick={() => setLevel(l)}>{l}</button>))}</div>
+              </label>
+            </div>
+            <div className="mnc-card">
+              <h2 className="mnc-h2">System check</h2>
+              {checkRow(checks.mic, 'Microphone', (ok) => ok ? 'Connected and permitted' : 'Blocked — you can still type answers')}
+              {checkRow(checks.speaker, 'Speaker / interviewer voice', (ok) => ok ? 'Voice playback available' : 'Voice unavailable in this browser')}
+              {checkRow(checks.speech, 'Voice input (speech-to-text)', (ok) => ok ? 'Available — click the mic to speak' : 'Not supported here — typing works fully')}
+              {checkRow(checks.network, 'Network', (ok) => ok ? 'Online' : 'Offline — reconnect before starting')}
+              <button type="button" className="mnc-secondary-btn" onClick={runChecks} disabled={checking}>{checking ? 'Running checks…' : 'Run system check'}</button>
+              <p className="mnc-note">We recommend headphones and a quiet room, just like a real panel round.</p>
+            </div>
+            <button type="button" className="mnc-primary-btn" onClick={beginInterview} disabled={!agreed || !candidateName.trim()}>Join interview <i className="fas fa-arrow-right" /></button>
+            {!agreed && <p className="mnc-note center">Accept the guidelines above to enable joining.</p>}
+          </aside>
+        </div>
+      </div>
+    )
+  }
+
+  /* ================= DONE ================= */
+  if (stage === 'done') {
+    // Bee 5Q: no report — ask free users to subscribe
+    if (isQuick) {
+      return (
+        <div className="interview-page bee-studio">
+          <div className="bee-subscribe-gate">
+            <img src={BEE_IMG} alt="MockBee" className="bee-subscribe-bee" draggable={false} />
+            <p className="bee-subscribe-eyebrow">Bee practice complete</p>
+            <h1>Nice work{candidateName.trim() ? `, ${candidateName.trim().split(' ')[0]}` : ''}!</h1>
+            <p className="bee-subscribe-lede">
+              You finished <strong>{totalQuestions} free questions</strong> for {roleName}.
+              {isPaid
+                ? ' Ready for another practice round anytime.'
+                : ' Unlock full panel interviews, more roles, and detailed feedback with a subscription.'}
+            </p>
+            <div className="bee-subscribe-actions">
+              {isPaid ? (
+                <button type="button" className="mnc-primary-btn" onClick={() => navigate('/dashboard/roles')}>
+                  Back to roles
+                </button>
+              ) : (
+                <>
+                  <button type="button" className="mnc-primary-btn" onClick={() => navigate('/dashboard/subscription')}>
+                    View subscription plans
+                  </button>
+                  <Link className="mnc-secondary-btn" to="/membership">See membership</Link>
+                </>
+              )}
+              <Link className="bee-subscribe-skip" to="/dashboard/roles">Maybe later</Link>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="interview-page mnc">
+        <header className="mnc-topbar">
+          <div className="mnc-brand"><span className="mnc-logo">M</span><div><strong>MockBee</strong><small>Talent Assessment Platform</small></div></div>
+          <span className="mnc-session-chip"><i className="fas fa-id-card" /> {sessionId}</span>
+        </header>
+        <div className="mnc-done">
+          <div className="mnc-done-card">
+            <span className="mnc-done-icon"><i className="fas fa-check" /></span>
+            <p className="mnc-eyebrow">Interview submitted</p>
+            <h1>Thank you, {candidateName.trim().split(' ')[0] || 'Candidate'}.</h1>
+            <p className="mnc-lede">Your {roleName} interview is complete. {transcriptRef.current.length} answer{transcriptRef.current.length === 1 ? '' : 's'} recorded in {fmtClock(elapsed)}.</p>
+            <ol className="mnc-nextsteps">
+              <li className="done"><i className="fas fa-check" /><div><strong>Interview completed</strong><small>Transcript securely saved to your account</small></div></li>
+              <li className="active"><i className="fas fa-chart-line" /><div><strong>Evaluation in progress</strong><small>Our AI panel is scoring communication, depth and structure</small></div></li>
+              <li><i className="fas fa-file-lines" /><div><strong>Report ready</strong><small>View scores, per-answer feedback and improvement plan</small></div></li>
+            </ol>
+            <div className="mnc-done-actions">
+              <button type="button" className="mnc-primary-btn" onClick={saveAndNavigate}>View my report <i className="fas fa-arrow-right" /></button>
+              <Link className="mnc-secondary-btn" to="/dashboard/roles">Back to roles</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ================= BEE STUDIO (exact mock layout) ================= */
+  if (isQuick) {
+    const qShown = Math.min(Math.max(questionCount, 1), totalQuestions)
+    return (
+      <div className="interview-page bee-studio">
+        <header className="bee-header">
+          <button type="button" className="bee-back" onClick={() => setConfirmEnd(true)} aria-label="Back">
             <i className="fas fa-arrow-left" />
           </button>
-        </div>
-
-        <div className="header-center">
-          <div className="role-badge">
-            <div className="role-icon-container">
-              <i className={roleIcon(roleName)} style={{ fontSize: '2rem', color: '#1a1a1a' }} />
-            </div>
-            <div className="role-info">
-              <h1>{title}</h1>
-              <span>{badge}</span>
+          <div className="bee-title-block">
+            <span className="bee-role-icon"><i className={roleFaIcon(roleName)} /></span>
+            <div>
+              <strong>{roleName}</strong>
+              <small>AI MOCK INTERVIEW</small>
             </div>
           </div>
-        </div>
-
-        <div className="header-right">
-          <button
-            id="mute-btn"
-            type="button"
-            onClick={toggleMute}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              color: '#1a1a1a',
-              marginRight: 15,
-            }}
-            title="Toggle Voice"
-          >
-            <i className={muted ? 'fas fa-volume-mute' : 'fas fa-volume-up'} style={muted ? { color: '#ef4444' } : undefined} />
-          </button>
-          {timerDisplay != null && (
-            <div className={`timer-container${timerWarning ? ' warning' : ''}`} id="timer-box">
-              <i className="fas fa-stopwatch" /> <span>{timerDisplay}</span>
-            </div>
-          )}
-          <div className="progress-container">
-            <div className="progress-text">
-              <span>{Math.min(questionCount, TOTAL_QUESTIONS)}</span> / <span>{TOTAL_QUESTIONS}</span>
-            </div>
-            <div className="progress-bar-bg">
-              <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
+          <div className="bee-header-right">
+            <button type="button" className="bee-icon-btn" onClick={toggleMute} title={muted ? 'Unmute' : 'Mute'}>
+              <i className={`fas ${muted ? 'fa-volume-xmark' : 'fa-volume-high'}`} />
+            </button>
+            <div className="bee-progress" title={`${qShown} of ${totalQuestions}`}>
+              <span className="bee-progress-track"><span style={{ width: `${(qShown / totalQuestions) * 100}%` }} /></span>
+              <em>{qShown} / {totalQuestions}</em>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="interview-main">
-        <main className="chat-container" ref={chatRef}>
-          {messages.map((msg) =>
-            msg.type === 'user' ? (
-              <div className="message message--user" key={msg.id}>
-                <div className="user-icon-wrap">
-                  <i className="fas fa-user" />
-                </div>
-                <div className="user-bubble">{msg.text}</div>
-              </div>
-            ) : (
-              <div className="message message--ai" key={msg.id}>
-                <div className="ai-bubble">
-                  {msg.feedback ? (
-                    <div className="feedback-box">
-                      <i className="fas fa-certificate icon" />
-                      <strong>Interviewer:</strong>
-                      <br />
-                      {msg.qNum ? (
-                        <strong style={{ color: 'var(--navy-dark)', fontSize: '1.05rem' }}>
-                          Q{msg.qNum}:{' '}
-                        </strong>
-                      ) : null}
-                      {formatBold(msg.text)}
-                    </div>
-                  ) : (
-                    formatBold(msg.text)
-                  )}
+        <div className="bee-body">
+          <main className="bee-chat" ref={chatRef}>
+            {messages.map((msg) => {
+              if (msg.type === 'phase') return null
+              if (msg.type === 'user') {
+                return (
+                  <div className="bee-bubble bee-bubble--user" key={msg.id}>{msg.text}</div>
+                )
+              }
+              const body = msg.qNum
+                ? (/^Q\d+/i.test(String(msg.text).trim()) ? msg.text : `Q${msg.qNum}: ${msg.text}`)
+                : msg.text
+              return (
+                <div className="bee-bubble bee-bubble--ai" key={msg.id}>
+                  {formatBold(body)}
                   {msg.retry && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessages((prev) => prev.filter((m) => m.id !== msg.id))
-                        requestAIQuestion()
-                      }}
-                      style={{
-                        margin: '8px auto',
-                        display: 'block',
-                        padding: '10px 24px',
-                        background: '#1a1a1a',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 8,
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                      }}
-                    >
-                      🔄 Retry
-                    </button>
+                    <button type="button" className="mnc-retry-btn" onClick={() => { setMessages((p) => p.filter((m) => m.id !== msg.id)); requestAIQuestion() }}>Retry</button>
                   )}
                 </div>
-              </div>
-            ),
-          )}
+              )
+            })}
+            {typing && (
+              <div className="bee-bubble bee-bubble--ai bee-typing"><span /><span /><span /></div>
+            )}
+          </main>
 
-          {typing && (
-            <div className="message message--ai" id="typing-indicator">
-              <div className="ai-bubble">
-                <i className="fas fa-spinner fa-spin" /> AI is thinking...
-              </div>
-            </div>
-          )}
+          <aside className={`bee-mascot${aiSpeaking ? ' is-speaking' : ''}`} aria-label="AI interviewer">
+            <span className="bee-mascot-badge">AI INTERVIEWER</span>
+            <img src={BEE_IMG} alt="AI Interviewer" className="bee-mascot-img" draggable={false} />
+          </aside>
+        </div>
 
-          {showResults && (
-            <div className="results-btn-container">
-              <button type="button" className="btn-view-results" onClick={saveAndNavigate}>
-                See Analysis and Report →
-              </button>
-              <div className="session-complete-msg">
-                <i className="fas fa-check-circle" /> Interview Assessment Complete
-              </div>
-            </div>
-          )}
-        </main>
-
-        <aside className="mascot-sidebar">
-          <div className="mascot-interviewer">
-            <div className="mascot-interviewer__label">AI Interviewer</div>
-            <img src={MASCOT} alt="MockBee Mascot" className="large-mascot" />
-          </div>
-        </aside>
-      </div>
-
-      {!complete && !showResults && (
-        <footer className="input-area">
-          <div className="input-container" style={{ position: 'relative' }}>
-            <div className="input-wrapper">
-              <input
-                type="text"
+        {!complete && (
+          <footer className="bee-composer">
+            <div className="bee-composer-row">
+              <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSubmit()
-                  }
-                }}
-                placeholder={listening ? '🎙️ Listening... Speak naturally.' : 'Type your answer here...'}
+                onChange={(e) => { setInput(e.target.value); inputBaselineRef.current = e.target.value }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }}
+                placeholder={awaitingAnswer ? 'Type your answer here...' : 'Please wait for the next question…'}
                 disabled={!awaitingAnswer || aiProcessing}
+                rows={1}
                 autoComplete="off"
               />
               <button
                 type="button"
-                className={`mic-btn${listening ? ' active' : ''}`}
-                title="Click to speak (Microphone)"
+                className={`bee-mic ${listening ? 'active' : ''}`}
                 onClick={toggleMic}
+                disabled={!awaitingAnswer}
+                title={listening ? 'Stop' : 'Voice'}
               >
                 <i className="fas fa-microphone" />
               </button>
               <button
                 type="button"
-                className="submit-btn"
-                disabled={!awaitingAnswer || aiProcessing}
+                className="bee-submit"
                 onClick={handleSubmit}
+                disabled={!awaitingAnswer || aiProcessing || !input.trim()}
               >
-                Submit →
+                {aiProcessing ? '…' : <>SUBMIT <span aria-hidden>→</span></>}
               </button>
             </div>
-            {listening && (
-              <div className="recording-indicator active">
-                <i className="fas fa-circle" /> Listening...
+            <p className="bee-composer-hint">Enter to submit • Shift+Enter for new line</p>
+          </footer>
+        )}
+
+        {confirmEnd && (
+          <div className="mnc-modal-backdrop" role="dialog" aria-modal="true">
+            <div className="mnc-modal">
+              <h2>End this interview?</h2>
+              <p>{transcriptRef.current.length ? `You have answered ${transcriptRef.current.length} question${transcriptRef.current.length === 1 ? '' : 's'}. Ending now will submit what you have completed for evaluation.` : 'You have not answered any questions yet. Ending now will discard this session.'}</p>
+              <div className="mnc-modal-actions">
+                <button type="button" className="mnc-end-btn" onClick={() => { setConfirmEnd(false); if (transcriptRef.current.length) finishInterview(); else navigate('/dashboard/roles') }}>{transcriptRef.current.length ? 'End & submit' : 'Discard & exit'}</button>
+                <button type="button" className="mnc-secondary-btn" onClick={() => setConfirmEnd(false)}>Cancel</button>
               </div>
-            )}
-            <div className="input-hint">Enter to submit • Shift+Enter for new line</div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /* ================= LIVE ROOM (MNC panel) ================= */
+  return (
+    <div className="interview-page mnc">
+      <header className="mnc-topbar">
+        <div className="mnc-brand"><span className="mnc-logo">M</span><div><strong>MockBee</strong><small>{badge}</small></div></div>
+        <div className="mnc-topbar-right">
+          <span className="mnc-rec"><span className="mnc-rec-dot" /> REC</span>
+          <span className="mnc-session-chip"><i className="fas fa-id-card" /> {sessionId}</span>
+          <span className="mnc-clock" title="Elapsed time"><i className="fas fa-clock" /> {fmtClock(elapsed)}</span>
+          {timerLeft != null && <span className={`mnc-clock ${timerLeft <= 60 ? 'warn' : ''}`}><i className="fas fa-stopwatch" /> {fmtClock(timerLeft)}</span>}
+          <button type="button" className="mnc-icon-btn" onClick={toggleMute} title={muted ? 'Unmute interviewer voice' : 'Mute interviewer voice'}><i className={`fas ${muted ? 'fa-volume-xmark' : 'fa-volume-high'}`} /></button>
+          <button type="button" className="mnc-end-btn" onClick={() => setConfirmEnd(true)}><i className="fas fa-phone-slash" /> End interview</button>
+        </div>
+      </header>
+
+      <nav className="mnc-stepper" aria-label="Interview rounds">
+        {PHASES.map((p, i) => (
+          <div key={p} className={`mnc-step ${i < phaseIdx ? 'done' : i === phaseIdx ? 'current' : ''}`}>
+            <span className="mnc-step-dot">{i < phaseIdx ? <i className="fas fa-check" /> : i + 1}</span><span className="mnc-step-label">{PHASE_META[p].short}</span>{i < PHASES.length - 1 && <span className="mnc-step-line" />}
+          </div>
+        ))}
+      </nav>
+
+      <div className="mnc-room">
+        <main className="mnc-transcript" ref={chatRef}>
+          {messages.map((msg) => {
+            if (msg.type === 'phase') return (<div className="mnc-phase-divider" key={msg.id}><span><i className="fas fa-flag" /> {msg.text}</span><small>{msg.desc}</small></div>)
+            if (msg.type === 'user') return (<div className="mnc-msg user" key={msg.id}><span className="mnc-msg-who">You · {candidateName.trim().split(' ')[0] || 'Candidate'}</span><div className="mnc-bubble user">{msg.text}</div></div>)
+            return (
+              <div className="mnc-msg ai" key={msg.id}>
+                <span className="mnc-msg-who">Interviewer{msg.qNum ? ` · Question ${msg.qNum} of ${totalQuestions}` : ''}</span>
+                <div className="mnc-bubble ai">{formatBold(msg.text)}
+                  {msg.retry && <button type="button" className="mnc-retry-btn" onClick={() => { setMessages((p) => p.filter((m) => m.id !== msg.id)); requestAIQuestion() }}>Retry</button>}
+                </div>
+              </div>
+            )
+          })}
+          {typing && <div className="mnc-msg ai"><span className="mnc-msg-who">Interviewer is typing</span><div className="mnc-bubble ai mnc-typing"><span /><span /><span /></div></div>}
+        </main>
+
+        <aside className="mnc-panel">
+          <div className="mnc-card">
+            <h3>Session progress</h3>
+            <div className="mnc-progress-row"><span>Question {Math.min(questionCount, totalQuestions)} / {totalQuestions}</span><span>{Math.round(progressPct)}%</span></div>
+            <div className="mnc-progress"><span style={{ width: `${progressPct}%` }} /></div>
+            <dl className="mnc-dl"><div><dt>Candidate</dt><dd>{candidateName || '—'}</dd></div><div><dt>Role</dt><dd>{roleName}</dd></div><div><dt>Level</dt><dd>{level}</dd></div><div><dt>Current round</dt><dd>{PHASE_META[currentPhase].label}</dd></div></dl>
+          </div>
+        </aside>
+      </div>
+
+      {!complete && (
+        <footer className="mnc-composer">
+          {listening && <div className="mnc-listening"><span className="mnc-rec-dot" /> Listening… speak now, click the mic again to stop.</div>}
+          <div className="mnc-composer-box">
+            <textarea value={input} onChange={(e) => { setInput(e.target.value); inputBaselineRef.current = e.target.value }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() } }} placeholder={awaitingAnswer ? 'Type your answer… (or use the microphone)' : 'Please wait for the next question…'} disabled={!awaitingAnswer || aiProcessing} rows={3} autoComplete="off" />
+            <div className="mnc-composer-bar">
+              <button type="button" className={`mnc-mic-btn ${listening ? 'active' : ''}`} onClick={toggleMic} disabled={!awaitingAnswer} title={listening ? 'Stop voice input' : 'Answer by voice'}><i className="fas fa-microphone" />{listening ? ' Stop' : ' Voice'}</button>
+              <span className="mnc-wordcount">{wordCount} words · Enter to submit · Shift+Enter for new line</span>
+              <button type="button" className="mnc-submit-btn" onClick={handleSubmit} disabled={!awaitingAnswer || aiProcessing || !input.trim()}>{aiProcessing ? 'Submitting…' : 'Submit answer'} <i className="fas fa-paper-plane" /></button>
+            </div>
           </div>
         </footer>
       )}
 
-      <div className={`demo-modal-overlay${showDemoModal ? ' active' : ''}`}>
-        <div className="demo-modal-card">
-          <button type="button" className="demo-modal-close" onClick={() => setShowDemoModal(false)}>
-            <i className="fas fa-times" />
-          </button>
-          <div className="demo-modal-icon">
-            <i className="fas fa-rocket" />
-          </div>
-          <h2 className="demo-modal-title">Demo Session Over!</h2>
-          <p className="demo-modal-text">
-            Your demo version is over. If you want, you can subscribe to the{' '}
-            <span className="highlight-gold">MockB Pro/Elite</span> member version to get more{' '}
-            <span className="highlight-gold">500+ interview questions</span> and a{' '}
-            <span className="highlight-gold">resume builder</span>.
-            <br />
-            <br />
-            Please generate your report below to view your results.
-          </p>
-          <div className="demo-modal-actions">
-            <Link to="/dashboard/subscription" className="btn-modal-primary">
-              <i className="fas fa-crown" /> Subscribe to MockB Membership
-            </Link>
+      {confirmEnd && (
+        <div className="mnc-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="mnc-modal">
+            <h2>End this interview?</h2>
+            <p>{transcriptRef.current.length ? `You have answered ${transcriptRef.current.length} question${transcriptRef.current.length === 1 ? '' : 's'}. Ending now will submit what you have completed for evaluation.` : 'You have not answered any questions yet. Ending now will discard this session.'}</p>
+              <div className="mnc-modal-actions">
+                <button type="button" className="mnc-end-btn" onClick={() => { setConfirmEnd(false); if (transcriptRef.current.length) finishInterview(); else navigate('/dashboard/roles') }}>{transcriptRef.current.length ? 'End & submit' : 'Discard & exit'}</button>
+                <button type="button" className="mnc-secondary-btn" onClick={() => setConfirmEnd(false)}>Cancel</button>
+              </div>
           </div>
         </div>
-      </div>
-
-      <style>{`
-        .demo-modal-overlay {
-          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 10000;
-          display: none; align-items: center; justify-content: center; opacity: 0;
-          transition: opacity 0.4s ease;
-        }
-        .demo-modal-overlay.active { display: flex; opacity: 1; }
-        .demo-modal-card {
-          background: #fdfaf7; width: 90%; max-width: 500px; padding: 50px 40px;
-          border-radius: 28px; position: relative; text-align: center;
-          border: 1px solid #e9dfd6; box-shadow: 0 30px 60px -12px rgba(0,0,0,0.6);
-        }
-        .demo-modal-close {
-          position: absolute; top: 24px; right: 24px; background: #F4E9E2; border: none;
-          width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
-        }
-        .demo-modal-icon { font-size: 3.5rem; color: #B09E93; margin-bottom: 25px; }
-        .demo-modal-title { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: #111827; margin-bottom: 12px; }
-        .demo-modal-text { font-size: 1.05rem; line-height: 1.6; color: #4b5563; margin-bottom: 30px; }
-        .demo-modal-actions { display: flex; flex-direction: column; gap: 12px; }
-        .btn-modal-primary {
-          background: #000; color: #fff; padding: 16px; border-radius: 12px; font-weight: 600;
-          text-decoration: none; border: 2px solid #000;
-        }
-        .highlight-gold { color: #B09E93; font-weight: 700; }
-      `}</style>
+      )}
     </div>
   )
 }

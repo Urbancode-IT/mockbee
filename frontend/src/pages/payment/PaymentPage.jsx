@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
 import { KEYS, getJSON } from '../../utils/storage'
 import './PaymentPage.css'
 
 export default function PaymentPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { setSubscription, user } = useAuth()
+  const embedded = location.pathname.startsWith('/dashboard')
 
   const planToPurchase = searchParams.get('plan') || 'elite'
   const billingPeriod = searchParams.get('billing') || 'monthly'
@@ -83,21 +86,23 @@ export default function PaymentPage() {
 
   const handlePayPal = () => {
     if (!paypalEmail || !paypalEmail.includes('@')) {
-      alert('Please enter a valid PayPal email')
+      toast.error('Please enter a valid PayPal email')
       return
     }
     simulatePay()
   }
 
   return (
-    <div className="payment-page">
-      <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Back">
-        <i className="fas fa-arrow-left" />
-      </button>
+    <div className={`payment-page${embedded ? ' payment-page--embedded' : ''}`}>
+      {!embedded && (
+        <button type="button" className="back-btn" onClick={() => navigate(-1)} aria-label="Back">
+          <i className="fas fa-arrow-left" />
+        </button>
+      )}
 
       <div className="payment-card">
         <div className="checkout-header">
-          <h1>Secure Checkout</h1>
+          <h1>{embedded ? 'Complete payment' : 'Secure Checkout'}</h1>
           <p>{labels.subtitle}</p>
         </div>
 

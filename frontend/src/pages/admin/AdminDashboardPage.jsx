@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { apiFetch } from '../../config/api'
 import { useAuth } from '../../context/AuthContext'
+import { useDialog } from '../../components/ui/DialogProvider'
+import EnterpriseAdminPanel from '../../components/admin/EnterpriseAdminPanel'
 import { KEYS, getItem } from '../../utils/storage'
 import '../../styles/admin-dashboard.css'
 
@@ -58,14 +61,16 @@ function categoryRows(session) {
   ]
 }
 
-export default function AdminDashboardPage() {
+export default function AdminDashboardPage({ embedded = false }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { confirm } = useDialog()
   const adminKey = getItem(KEYS.adminToken) || user?.adminToken || ''
 
-  const [tab, setTab] = useState('users')
+  const [tab, setTab] = useState('overview')
   const [allUsers, setAllUsers] = useState([])
   const [allSessions, setAllSessions] = useState([])
+  const [analytics, setAnalytics] = useState(null)
   const [usersLoading, setUsersLoading] = useState(true)
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [userSearch, setUserSearch] = useState('')
@@ -78,15 +83,15 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (getItem(KEYS.isAdmin) !== 'true' && !user?.isAdmin) {
-      alert('Access Denied. Admin only.')
-      navigate('/login', { replace: true })
+      toast.error('Access Denied. Admin only.')
+      navigate(embedded ? '/dashboard' : '/login', { replace: true })
       return
     }
     if (!adminKey) {
-      alert('Admin session expired. Please log in again.')
-      navigate('/login', { replace: true })
+      toast.error('Admin session expired. Please log in again.')
+      navigate(embedded ? '/dashboard' : '/login', { replace: true })
     }
-  }, [adminKey, navigate, user?.isAdmin])
+  }, [adminKey, embedded, navigate, user?.isAdmin])
 
   const loadData = useCallback(async () => {
     if (!adminKey) return
@@ -109,6 +114,13 @@ export default function AdminDashboardPage() {
       setAllSessions([])
     } finally {
       setSessionsLoading(false)
+    }
+
+    try {
+      const { body } = await apiFetch(`/api/admin/analytics?key=${encodeURIComponent(adminKey)}`)
+      if (body.status === 'success') setAnalytics(body.analytics || null)
+    } catch {
+      setAnalytics(null)
     }
   }, [adminKey])
 
@@ -140,55 +152,53 @@ export default function AdminDashboardPage() {
     return `${Math.round(scored.reduce((a, s) => a + s.score, 0) / scored.length)}%`
   }, [allSessions])
 
-  const uniqueRoles = useMemo(
-    () => new Set(allSessions.map((s) => s.role)).size,
-    [allSessions],
-  )
-
   const handleLogout = () => {
     logout()
     navigate('/login')
   }
 
   const deleteUser = async (email) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete user ${email} and all their interview sessions? This action cannot be undone.`,
-      )
-    ) {
-      return
-    }
+    const ok = await confirm(
+      `Are you sure you want to delete user ${email} and all their interview sessions? This action cannot be undone.`,
+      { title: 'Delete user', confirmLabel: 'Delete', danger: true },
+    )
+    if (!ok) return
     try {
       const { body } = await apiFetch(
         `/api/admin/users/${encodeURIComponent(email)}?key=${encodeURIComponent(adminKey)}`,
         { method: 'DELETE' },
       )
       if (body.status === 'success') {
-        alert('User deleted successfully.')
+        toast.success('User deleted successfully.')
         loadData()
       } else {
-        alert(`Error: ${body.detail}`)
+        toast.error(`Error: ${body.detail}`)
       }
     } catch {
-      alert('Failed to delete user. Make sure backend is running.')
+      toast.error('Failed to delete user. Make sure backend is running.')
     }
   }
 
   const deleteSession = async (sessionId) => {
-    if (!window.confirm('Are you sure you want to delete this interview session?')) return
+    const ok = await confirm('Are you sure you want to delete this interview session?', {
+      title: 'Delete session',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       const { body } = await apiFetch(
         `/api/admin/sessions/${encodeURIComponent(sessionId)}?key=${encodeURIComponent(adminKey)}`,
         { method: 'DELETE' },
       )
       if (body.status === 'success') {
-        alert('Session deleted.')
+        toast.success('Session deleted.')
         loadData()
       } else {
-        alert(`Error: ${body.detail}`)
+        toast.error(`Error: ${body.detail}`)
       }
     } catch {
-      alert('Failed to delete session.')
+      toast.error('Failed to delete session.')
     }
   }
 
@@ -243,15 +253,15 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({ ...studentForm, key: adminKey }),
       })
       if (body.status === 'success') {
-        alert('Student created successfully!')
+        toast.success('Student created successfully!')
         setShowAddStudent(false)
         setStudentForm({ name: '', email: '', password: '' })
         loadData()
       } else {
-        alert(`Error: ${body.detail}`)
+        toast.error(`Error: ${body.detail}`)
       }
     } catch {
-      alert('Failed to create student. Is the backend running?')
+      toast.error('Failed to create student. Is the backend running?')
     } finally {
       setCreating(false)
     }
@@ -260,21 +270,38 @@ export default function AdminDashboardPage() {
   if (!adminKey && getItem(KEYS.isAdmin) !== 'true') return null
 
   return (
-    <div className="admin-dashboard-page">
-      <div className="admin-topbar">
-        <div className="logo-area">
-          <i className="fas fa-shield-halved" />
-          <h1>
-            Mock<span>Bee</span> Admin
-          </h1>
+    <div className={`admin-dashboard-page${embedded ? ' embedded' : ''}`}>
+      {!embedded && (
+        <div className="admin-topbar">
+          <div className="logo-area">
+            <i className="fas fa-shield-halved" />
+            <h1>
+              Mock<span>Bee</span> Admin
+            </h1>
+          </div>
+          <span className="admin-badge">
+            <i className="fas fa-lock" style={{ marginRight: 6 }} /> Admin Access
+          </span>
+          <button type="button" className="logout-btn" onClick={handleLogout}>
+            <i className="fas fa-right-from-bracket" /> Logout
+          </button>
         </div>
-        <span className="admin-badge">
-          <i className="fas fa-lock" style={{ marginRight: 6 }} /> Admin Access
-        </span>
-        <button type="button" className="logout-btn" onClick={handleLogout}>
-          <i className="fas fa-right-from-bracket" /> Logout
-        </button>
-      </div>
+      )}
+      {embedded && (
+        <div className="admin-embedded-head">
+          <span className="admin-badge dark">
+            <i className="fas fa-lock" style={{ marginRight: 6 }} /> Admin Access
+          </span>
+          <button
+            type="button"
+            className="admin-refresh-btn"
+            onClick={() => navigate('/admin')}
+            title="Open full-screen admin"
+          >
+            <i className="fas fa-expand" /> Full Admin Page
+          </button>
+        </div>
+      )}
 
       <div className="admin-stats-row">
         <div className="admin-stat-card">
@@ -291,8 +318,8 @@ export default function AdminDashboardPage() {
             <i className="fas fa-clipboard-check" />
           </div>
           <div className="stat-text">
-            <h3>{allSessions.length || '—'}</h3>
-            <p>Interview Sessions</p>
+            <h3>{analytics?.total_interviews_conducted ?? allSessions.length ?? '—'}</h3>
+            <p>Interviews Conducted</p>
           </div>
         </div>
         <div className="admin-stat-card">
@@ -300,40 +327,60 @@ export default function AdminDashboardPage() {
             <i className="fas fa-chart-line" />
           </div>
           <div className="stat-text">
-            <h3>{avgScore}</h3>
+            <h3>
+              {analytics?.average_score != null ? `${analytics.average_score}%` : avgScore}
+            </h3>
             <p>Avg Score</p>
           </div>
         </div>
         <div className="admin-stat-card">
           <div className="stat-icon active">
-            <i className="fas fa-bolt" />
+            <i className="fas fa-circle-check" />
           </div>
           <div className="stat-text">
-            <h3>{uniqueRoles || '—'}</h3>
-            <p>Unique Roles Used</p>
+            <h3>{analytics?.completed_interviews ?? '—'}</h3>
+            <p>Completed Interviews</p>
           </div>
         </div>
       </div>
 
-      <div className="admin-tab-bar">
-        <button
-          type="button"
-          className={`admin-tab-btn${tab === 'users' ? ' active' : ''}`}
-          onClick={() => setTab('users')}
-        >
-          <i className="fas fa-users" style={{ marginRight: 6 }} /> All Users
-        </button>
-        <button
-          type="button"
-          className={`admin-tab-btn${tab === 'sessions' ? ' active' : ''}`}
-          onClick={() => setTab('sessions')}
-        >
-          <i className="fas fa-history" style={{ marginRight: 6 }} /> All Sessions
-        </button>
+      {/* Single unified admin module — one tab bar for everything */}
+      <div className="admin-tab-bar" role="tablist" aria-label="Admin modules">
+        {[
+          ['overview', 'fa-chart-pie', 'Overview'],
+          ['banks', 'fa-database', 'Question Banks'],
+          ['review', 'fa-list-check', 'Review'],
+          ['configure', 'fa-sliders', 'Configure Panel'],
+          ['interviews', 'fa-building', 'Interview Panels'],
+          ['users', 'fa-users', 'Users'],
+          ['sessions', 'fa-history', 'Sessions & Reports'],
+        ].map(([key, icon, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={`admin-tab-btn${tab === key ? ' active' : ''}`}
+            onClick={() => setTab(key)}
+          >
+            <i className={`fas ${icon}`} style={{ marginRight: 6 }} /> {label}
+          </button>
+        ))}
       </div>
 
+      <main className="admin-content">
+      {['overview', 'banks', 'review', 'configure', 'interviews'].includes(tab) && (
+        <EnterpriseAdminPanel
+          adminKey={adminKey}
+          analytics={analytics}
+          onRefresh={loadData}
+          activeSection={tab}
+          onSectionChange={setTab}
+        />
+      )}
+
       {tab === 'users' && (
-        <div className="admin-table-container">
+        <div className="admin-section">
           <div className="admin-table-header">
             <h2>
               <i className="fas fa-user-group" style={{ color: 'var(--gold-dark)', marginRight: 8 }} />
@@ -412,7 +459,7 @@ export default function AdminDashboardPage() {
       )}
 
       {tab === 'sessions' && (
-        <div className="admin-table-container">
+        <div className="admin-section">
           <div className="admin-table-header">
             <h2>
               <i
@@ -537,6 +584,7 @@ export default function AdminDashboardPage() {
           )}
         </div>
       )}
+      </main>
 
       {overviewSession && (
         <div className="admin-modal-overlay" onClick={() => setOverviewSession(null)}>

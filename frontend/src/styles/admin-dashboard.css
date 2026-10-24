@@ -9,7 +9,7 @@
   --text-medium: #6b6b6b;
   --green: #27ae60;
   --red: #e53935;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Satoshi', sans-serif;
   background: var(--cream-bg);
   color: var(--text-dark);
   min-height: 100vh;
@@ -173,6 +173,70 @@
 
 .admin-table-container {
   padding: 16px 40px 40px;
+}
+
+/* Admin embedded inside user Dashboard (/dashboard/admin) */
+.admin-dashboard-page.embedded {
+  min-height: auto;
+  background: transparent;
+}
+
+.admin-dashboard-page.embedded .admin-stats-row {
+  padding: 6px 0 4px;
+}
+
+.admin-dashboard-page.embedded .admin-tab-bar {
+  padding: 16px 0 0;
+}
+
+.admin-dashboard-page.embedded .admin-content {
+  padding: 16px 0 24px;
+}
+
+.admin-embedded-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.admin-badge.dark {
+  background: var(--navy);
+  border: 1px solid var(--navy);
+  color: var(--gold);
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* Unified single admin page */
+.admin-content {
+  padding: 16px 40px 40px;
+}
+
+.admin-content .admin-table-container,
+.admin-content .admin-section {
+  padding: 0;
+}
+
+.admin-embedded-module {
+  padding: 0;
+}
+
+.admin-tab-bar {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+@media (max-width: 900px) {
+  .admin-content {
+    padding: 16px 20px 32px;
+  }
 }
 
 .admin-table-header {

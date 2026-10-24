@@ -239,7 +239,7 @@
 }
 
 .forgot-link:hover {
-    color: #FF7675; /* Light Red hover per request */
+    color: var(--gold-dark);
     text-decoration: underline;
 }
 
@@ -420,4 +420,4 @@
     text-decoration: underline !important;
 }
 
-/* Login page has no shared navbar — do not override .navbar globally */}
+/* Login page has no shared navbar — do not override .navbar globally */

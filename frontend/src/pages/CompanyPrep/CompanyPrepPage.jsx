@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useDialog } from '../../components/ui/DialogProvider'
 import '../../styles/company-prep.css'
 
 const COMPANIES = [
@@ -25,14 +26,16 @@ const COMPANIES = [
 
 export default function CompanyPrepPage() {
   const navigate = useNavigate()
+  const { confirm } = useDialog()
   const { user, isElite } = useAuth()
   const hasEliteAccess =
     isElite || user?.isStudent || user?.role === 'STUDENT'
 
-  const handleClick = (company) => {
+  const handleClick = async (company) => {
     if (!hasEliteAccess) {
-      const upgrade = window.confirm(
+      const upgrade = await confirm(
         'Company-specific prep is an Elite exclusive feature. Pro and Free users can use Quick Practice.\n\nUpgrade to Elite?',
+        { title: 'Elite feature', confirmLabel: 'Upgrade', cancelLabel: 'Not now' },
       )
       if (upgrade) navigate('/dashboard/subscription')
       return
@@ -42,7 +45,6 @@ export default function CompanyPrepPage() {
 
   return (
     <div className="company-prep-page">
-      <h2>Top Company Interview Prep</h2>
       <p className="subtitle">
         Open company-specific question banks and review previous interview questions by topic.
       </p>

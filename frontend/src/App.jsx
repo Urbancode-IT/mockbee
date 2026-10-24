@@ -21,6 +21,14 @@ import RoadmapPage from './pages/Roadmap/RoadmapPage'
 import PaymentPage from './pages/payment/PaymentPage'
 import InterviewPage from './pages/interview/InterviewPage'
 import CompanyInterviewPage from './pages/interview/CompanyInterviewPage'
+import ExcelInterviewSetupPage from './pages/interview/ExcelInterviewSetupPage'
+import ExcelInterviewPage from './pages/interview/ExcelInterviewPage'
+import CodingInterviewSetupPage from './pages/interview/CodingInterviewSetupPage'
+import CodingCandidateEntryPage from './pages/interview/CodingCandidateEntryPage'
+import CodingInterviewPage from './pages/interview/CodingInterviewPage'
+import EnterpriseInvitePage from './pages/interview/EnterpriseInvitePage'
+import EnterpriseInterviewRoomPage from './pages/interview/EnterpriseInterviewRoomPage'
+import EnterpriseReportPage from './pages/interview/EnterpriseReportPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 
 export default function App() {
@@ -42,15 +50,29 @@ export default function App() {
         <Route path="company-prep" element={<CompanyPrepPage />} />
         <Route path="company-prep/:company" element={<CompanyTopicsPage />} />
         <Route path="company-prep/:company/questions" element={<CompanyQuestionsPage />} />
+        <Route path="excel-interview" element={<ExcelInterviewSetupPage />} />
+        <Route path="coding-interview" element={<CodingInterviewSetupPage />} />
         <Route path="subscription" element={<SubscriptionPage />} />
         <Route path="achievements" element={<AchievementsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
         <Route path="payment" element={<PaymentPage />} />
+        <Route path="admin" element={<AdminDashboardPage embedded />} />
       </Route>
 
       <Route path="/interview" element={<InterviewPage />} />
       <Route path="/interview/company/:company" element={<CompanyInterviewPage />} />
+      <Route path="/interview/excel/:bankId" element={<ExcelInterviewPage />} />
+      <Route path="/coding/:bankId" element={<CodingCandidateEntryPage />} />
+      <Route path="/coding/:bankId/interview" element={<CodingInterviewPage />} />
+      {/* Hiring panel (admin-published) — primary path */}
+      <Route path="/panel/:interviewId" element={<EnterpriseInvitePage />} />
+      <Route path="/panel/:interviewId/room" element={<EnterpriseInterviewRoomPage />} />
+      <Route path="/panel/:interviewId/report/:sessionId" element={<EnterpriseReportPage />} />
+      {/* Legacy invite URLs still work */}
+      <Route path="/invite/:interviewId" element={<EnterpriseInvitePage />} />
+      <Route path="/invite/:interviewId/room" element={<EnterpriseInterviewRoomPage />} />
+      <Route path="/invite/:interviewId/report/:sessionId" element={<EnterpriseReportPage />} />
       <Route path="/reports/quick" element={<QuickReportPage />} />
       <Route path="/payment" element={<PaymentPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />

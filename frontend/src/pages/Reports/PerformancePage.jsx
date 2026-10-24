@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../config/api'
+import { useDialog } from '../../components/ui/DialogProvider'
 import { KEYS, getItem, getJSON, setItem, setJSON } from '../../utils/storage'
 import {
   QUICK_INTERVIEW_MODES,
@@ -253,6 +254,7 @@ function persistAnalysis(sessionData, analysis, transcript) {
 export default function PerformancePage({ forceQuickFilter = false }) {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { confirm } = useDialog()
   const filterParam = forceQuickFilter ? 'quick' : searchParams.get('filter')
   const viewParam = searchParams.get('view')
 
@@ -261,7 +263,6 @@ export default function PerformancePage({ forceQuickFilter = false }) {
   const [session, setSession] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [feedbackText, setFeedbackText] = useState('Analyzing your interview responses...')
-  const [slide, setSlide] = useState(0)
   const [hideBack, setHideBack] = useState(false)
   const [proTheme, setProTheme] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -280,7 +281,6 @@ export default function PerformancePage({ forceQuickFilter = false }) {
     const normalized = normalizeInterviewSession(sessionData)
     setSession(normalized)
     setView('detail')
-    setSlide(0)
     setAnalysis(null)
 
     const isQuick = QUICK_INTERVIEW_MODES.includes(normalized.mode)
@@ -410,9 +410,14 @@ export default function PerformancePage({ forceQuickFilter = false }) {
     return unique
   }, [filterParam, history])
 
-  const deleteReport = (event, indexInFullHistory) => {
+  const deleteReport = async (event, indexInFullHistory) => {
     event.stopPropagation()
-    if (!window.confirm("Delete this report? You won't be able to recover this session feedback.")) return
+    const ok = await confirm("Delete this report? You won't be able to recover this session feedback.", {
+      title: 'Delete report',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     const next = [...history]
     next.splice(indexInFullHistory, 1)
     setJSON(KEYS.interviews, next)
@@ -450,25 +455,27 @@ export default function PerformancePage({ forceQuickFilter = false }) {
 
   if (view === 'detail' && session) {
     return (
-      <div id="detailed-view">
-        {!hideBack && (
-          <div id="back-history-container" style={{ padding: '20px 30px', background: 'var(--cream-bg)' }}>
-            <button type="button" className="btn-back" onClick={showHistory}>
-              <i className="fas fa-arrow-left" /> BACK TO HISTORY
+      <div id="detailed-view" className="report-detail">
+        <header className="report-hero">
+          {!hideBack && (
+            <button type="button" className="report-hero__back" onClick={showHistory} aria-label="Back to history">
+              <i className="fas fa-arrow-left" />
             </button>
-          </div>
-        )}
-
-        <header className="report-header">
-          <h1>MOCKBEE PERFORMANCE REPORT</h1>
-          <div
-            className="user-info"
-            style={{ color: 'var(--gold-dark)', fontWeight: 800, fontSize: '1.1rem', marginTop: 5 }}
-          >
-            ROLE: {(session.role || '').toUpperCase()}
-          </div>
-          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-light)', marginTop: 5 }}>
-            DATE: {(session.date || '--').toUpperCase()}
+          )}
+          <div className="report-hero__main">
+            <p className="report-hero__eyebrow">Interview report</p>
+            <h1 className="report-hero__title">{session.role || 'Interview'}</h1>
+            <div className="report-hero__meta">
+              <span><i className="fas fa-calendar" /> {session.date || '—'}</span>
+              {session.mode && (
+                <span className="report-hero__chip">
+                  {QUICK_INTERVIEW_MODES.includes(session.mode) ? 'Bee practice' : 'Full panel'}
+                </span>
+              )}
+              {typeof session.totalQuestions === 'number' && session.totalQuestions > 0 && (
+                <span>{session.totalQuestions} questions</span>
+              )}
+            </div>
           </div>
         </header>
 
@@ -694,58 +701,39 @@ export default function PerformancePage({ forceQuickFilter = false }) {
             </div>
           </div>
 
-          <div className="card transcript-card" style={{ marginTop: 20 }}>
-            <div className="card-title">Interview Transcript</div>
+          <div className="card transcript-card transcript-card--feed" style={{ marginTop: 20 }}>
+            <div className="card-title transcript-card__head">
+              <span>Interview Transcript</span>
+              {transcript.length > 0 && (
+                <em className="transcript-count">{transcript.length} Q&amp;A</em>
+              )}
+            </div>
             {transcript.length === 0 ? (
-              <p style={{ textAlign: 'center', padding: 20, fontStyle: 'italic' }}>
-                No responses were captured during this session.
-              </p>
+              <p className="transcript-empty">No responses were captured during this session.</p>
             ) : (
-              <>
-                <div className="transcript-slider" style={{ overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      transition: 'transform 0.3s',
-                      transform: `translateX(-${slide * 100}%)`,
-                    }}
-                  >
-                    {transcript.map((item, index) => (
-                      <div className="q-item" key={index} style={{ minWidth: '100%', boxSizing: 'border-box' }}>
-                        <div className="q-row">
-                          <span className="q-num">Q{index + 1}</span>
-                          <p className="q-txt">{item.question}</p>
-                        </div>
-                        <div className="a-row">
-                          <span className="a-label">ANSWER:</span>
-                          <p className="a-txt">{item.answer}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="slider-controls">
-                  <button type="button" disabled={slide === 0} onClick={() => setSlide((s) => s - 1)}>
-                    Prev
-                  </button>
-                  <span>
-                    {slide + 1} / {transcript.length}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={slide >= transcript.length - 1}
-                    onClick={() => setSlide((s) => s + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
+              <div className="transcript-feed">
+                {transcript.map((item, index) => (
+                  <article className="transcript-turn" key={index}>
+                    <div className="transcript-q">
+                      <span className="q-num">Q{index + 1}</span>
+                      <p className="q-txt">{item.question}</p>
+                    </div>
+                    <div className="transcript-a">
+                      <span className="a-who">Your answer</span>
+                      <p className="a-txt">{item.answer || '—'}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
             )}
           </div>
 
-          <div className="practice-cta" style={{ marginTop: 30, textAlign: 'center' }}>
-            <button type="button" className="btn-primary" onClick={() => navigate('/dashboard/roles')}>
+          <div className="practice-cta">
+            <button type="button" className="btn-practice-again" onClick={() => navigate('/dashboard/roles')}>
               Practice Again
+            </button>
+            <button type="button" className="btn-back-roles" onClick={() => navigate('/dashboard')}>
+              Back to dashboard
             </button>
           </div>
         </div>
@@ -754,15 +742,12 @@ export default function PerformancePage({ forceQuickFilter = false }) {
   }
 
   return (
-    <div id="history-view" className="report-container">
-      <header className="report-header" style={{ marginBottom: 40 }}>
-        <h1>
-          {filterParam === 'quick' ? 'QUICK PRACTICE REPORTS' : 'INTERVIEW PERFORMANCE HISTORY'}
-        </h1>
-        <p style={{ color: 'var(--text-medium)', fontWeight: 500 }}>
-          Select a past session to view your detailed AI-powered feedback.
-        </p>
-      </header>
+    <div id="history-view" className="report-container report-container--dashboard">
+      <p className="report-intro">
+        {filterParam === 'quick'
+          ? 'Select a quick practice session to view detailed AI feedback.'
+          : 'Select a past session to view your detailed AI-powered feedback.'}
+      </p>
 
       <div className="history-grid">
         {loading ? (

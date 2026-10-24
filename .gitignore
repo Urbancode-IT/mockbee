@@ -1,7 +1,21 @@
-__pycache__/
-*.pyc
-.venv/
-venv/
+# Dependencies
+node_modules/
 frontend/node_modules/
+backend/node_modules/
+
+# Env (keep .env.example)
+.env
+**/.env
+!.env.example
+!**/.env.example
+
+# Build / logs
+frontend/dist/
+*.log
 .DS_Store
-*.env
+
+# Local temp / scratch (do not push)
+.tmp_*/
+.tmp_*
+**/.tmp_*
+WhatsApp Video*

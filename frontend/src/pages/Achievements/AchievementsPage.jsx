@@ -14,7 +14,6 @@ export default function AchievementsPage() {
 
   return (
     <div className="achievements-page">
-      <h2>Career Milestones</h2>
       <div className="badge-grid">
         {BADGES.map((b) => {
           const isUnlocked = unlockedIds.includes(b.id)

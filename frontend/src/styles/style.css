@@ -3,8 +3,6 @@
    Theme: Vintage Parchment / Warm Cream
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap');
-
 /* ---- CSS Reset & Root Variables ---- */
 *,
 *::before,
@@ -48,24 +46,45 @@ html {
   scroll-behavior: smooth;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
   font-family: var(--font-body);
   background-color: var(--cream-bg);
   color: var(--text-dark);
-  min-height: 100vh;
+  height: 100%;
+  min-height: 100%;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
 }
 
+/* Dashboard owns its own viewport scroll — don't add a second browser scrollbar */
+html.dashboard-mode,
+html.dashboard-mode body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.dashboard-mode {
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
 #root {
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
+}
+
+html.dashboard-mode #root {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Shared page width — used by landing / footer / roles */
@@ -1561,7 +1580,7 @@ body {
   font-size: 4rem;
   color: #1a2535;
   opacity: 0.08;
-  font-family: serif;
+  font-family: var(--font-heading);
 }
 
 /* ============================================

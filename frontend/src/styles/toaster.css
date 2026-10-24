@@ -1,0 +1,105 @@
+/* MockBee toaster — matches confirm card (brown primary / peach cancel) */
+.mb-toaster[data-sonner-toaster] {
+  --normal-bg: #ffffff;
+  --normal-border: rgba(107, 62, 46, 0.12);
+  --normal-text: #1a1a1a;
+  --success-bg: #ffffff;
+  --success-border: rgba(107, 62, 46, 0.14);
+  --success-text: #1a1a1a;
+  --error-bg: #ffffff;
+  --error-border: rgba(107, 62, 46, 0.14);
+  --error-text: #1a1a1a;
+  --warning-bg: #ffffff;
+  --warning-border: rgba(107, 62, 46, 0.14);
+  --warning-text: #1a1a1a;
+  --info-bg: #ffffff;
+  --info-border: rgba(107, 62, 46, 0.14);
+  --info-text: #1a1a1a;
+  font-family: inherit;
+}
+
+.mb-toast[data-sonner-toast] {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  border: 1px solid rgba(107, 62, 46, 0.12) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 18px 48px rgba(60, 36, 24, 0.14) !important;
+  padding: 16px 18px !important;
+  gap: 10px !important;
+  min-width: min(360px, calc(100vw - 32px));
+}
+
+.mb-toast__title {
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  color: #1a1a1a !important;
+  letter-spacing: -0.01em;
+}
+
+.mb-toast__desc {
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  color: #3a3a3a !important;
+  line-height: 1.45 !important;
+}
+
+.mb-toast__action {
+  background: #6b3e2e !important;
+  color: #ffffff !important;
+  border: 2px solid #6b3e2e !important;
+  outline: 1px solid #ffffff;
+  outline-offset: -5px;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 8px 16px !important;
+}
+
+.mb-toast__action:hover {
+  background: #5a3326 !important;
+  border-color: #5a3326 !important;
+}
+
+.mb-toast__cancel {
+  background: #f7d4c6 !important;
+  color: #1a1a1a !important;
+  border: none !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 8px 16px !important;
+}
+
+.mb-toast__cancel:hover {
+  background: #f0c4b2 !important;
+}
+
+.mb-toast__close {
+  background: #f7d4c6 !important;
+  border: none !important;
+  color: #6b3e2e !important;
+  border-radius: 999px !important;
+  left: auto !important;
+  right: -8px !important;
+  top: -8px !important;
+  transform: none !important;
+}
+
+.mb-toast__close:hover {
+  background: #f0c4b2 !important;
+  color: #1a1a1a !important;
+}
+
+.mb-toast--success [data-icon] {
+  color: #6b3e2e;
+}
+
+.mb-toast--error [data-icon] {
+  color: #a33b2b;
+}
+
+.mb-toast--warning [data-icon] {
+  color: #b07a2e;
+}
+
+.mb-toast--info [data-icon] {
+  color: #6b3e2e;
+}

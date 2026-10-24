@@ -5,23 +5,16 @@
   --navy: #1a1a1a;
   --text-medium: #666;
   font-family: 'Satoshi', sans-serif;
-  background: var(--cream-bg);
-  padding: 30px;
+  background: transparent;
+  padding: 0;
   color: var(--navy);
   line-height: 1.5;
-}
-
-.company-prep-page h2 {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.5rem;
-  margin-bottom: 8px;
-  font-weight: 900;
 }
 
 .company-prep-page .subtitle {
   font-size: 0.85rem;
   color: var(--text-medium);
-  margin-bottom: 25px;
+  margin-bottom: 20px;
 }
 
 .company-grid {
@@ -194,9 +187,15 @@
 /* Topics */
 .company-topics-page {
   font-family: 'Satoshi', sans-serif;
-  background: #fff;
-  padding: 40px;
+  background: transparent;
+  padding: 0;
   color: #1a1a1a;
+}
+
+.company-topics-page .page-lead {
+  color: #666;
+  margin: 0 0 18px;
+  font-size: 0.9rem;
 }
 
 .company-topics-page .back-btn,
@@ -204,7 +203,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 25px;
+  margin-bottom: 16px;
   background: #1a1a1a;
   color: #d8c4b6;
   text-decoration: none;
@@ -225,7 +224,7 @@
 }
 
 .company-topics-page h2 {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Satoshi', sans-serif;
   font-size: 2rem;
   margin-bottom: 10px;
 }
@@ -278,8 +277,8 @@
   --navy: #1a1a1a;
   --muted: #666;
   font-family: 'Satoshi', sans-serif;
-  background: #f8f9fa;
-  padding: 32px;
+  background: transparent;
+  padding: 0;
   color: var(--navy);
 }
 
@@ -293,18 +292,13 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 20px;
-  margin-bottom: 22px;
-}
-
-.company-questions-page h1 {
-  font-family: 'Playfair Display', serif;
-  font-size: 2.2rem;
-  margin: 0 0 8px;
+  margin-bottom: 16px;
 }
 
 .company-questions-page .header-subtitle {
   color: var(--muted);
   margin: 0;
+  font-size: 0.9rem;
 }
 
 .stats-row {

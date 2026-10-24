@@ -3,8 +3,15 @@ import '../../styles/quick-practice.css'
 
 const MODES = [
   {
-    to: '/dashboard/practice/5-min',
+    to: '/dashboard/excel-interview',
     className: 'option-card high-intensity',
+    icon: 'fas fa-file-excel',
+    title: 'excel AI interview',
+    desc: 'Upload your Excel questions. AI asks out loud, listens to your voice, then next Q.',
+  },
+  {
+    to: '/dashboard/practice/5-min',
+    className: 'option-card',
     icon: 'fas fa-stopwatch',
     title: '5-minute drill',
     desc: 'High-pressure technical sprint. 5 questions, total focus.',
@@ -35,8 +42,7 @@ const MODES = [
 export default function QuickPracticePage() {
   return (
     <div className="practice-container">
-      <header className="practice-header">
-        <h1 className="premium-title">Quick Practice</h1>
+      <header className="practice-header practice-header--compact">
         <p className="premium-subtitle">Sharpen your edge instantly</p>
       </header>
 

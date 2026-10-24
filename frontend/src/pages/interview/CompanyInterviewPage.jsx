@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import AiInterviewerAvatar from '../../components/interview/AiInterviewerAvatar'
 import { apiFetch } from '../../config/api'
 import COMPANY_DATA from '../../data/companyQuestions'
 import { KEYS, getItem, getJSON, setItem, setJSON } from '../../utils/storage'
 import '../../styles/interview.css'
-
-const MASCOT = '/images/ChatGPT%20Image%20Mar%2030,%202026,%2010_43_13%20AM.png'
 
 function formatBold(text) {
   const parts = String(text || '').split(/(\*\*.*?\*\*)/g)
@@ -193,12 +192,15 @@ export default function CompanyInterviewPage() {
         <div className="header-right">
           <div className="progress-container">
             <div className="progress-text">
-              <span>{displayQ}</span> / <span>{questions.length}</span>
+              Question <span>{displayQ}</span> / <span>{questions.length || '—'}</span>
             </div>
             <div className="progress-bar-bg">
               <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
+          <button type="button" className="submit-btn" style={{ background: '#dc2626' }} onClick={() => { if (transcriptRef.current.length) { setComplete(true); setShowResults(true) } else navigate(-1) }}>
+            End
+          </button>
         </div>
       </header>
 
@@ -220,10 +222,7 @@ export default function CompanyInterviewPage() {
           )}
         </main>
         <aside className="mascot-sidebar">
-          <div className="mascot-interviewer">
-            <div className="mascot-interviewer__label">Company Expert</div>
-            <img src={MASCOT} alt="Mascot" className="large-mascot" />
-          </div>
+          <AiInterviewerAvatar label="Company Expert" />
         </aside>
       </div>
 
@@ -231,26 +230,25 @@ export default function CompanyInterviewPage() {
         <footer className="input-area">
           <div className="input-container">
             <div className="input-wrapper">
-              <input
-                type="text"
+              <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSubmit()
                   }
                 }}
-                placeholder="Your technical answer..."
+                placeholder="Type your answer… (Enter to submit, Shift+Enter for new line)"
                 autoComplete="off"
+                rows={2}
+                style={{ flex: 1, border: 'none', padding: '10px 12px', font: 'inherit', fontSize: '.95rem', outline: 'none', resize: 'vertical', minHeight: 44, background: 'transparent' }}
               />
-              <button type="button" className="mic-btn" title="Voice not enabled in company mode">
-                <i className="fas fa-microphone" />
-              </button>
-              <button type="button" className="submit-btn" onClick={handleSubmit}>
-                Submit →
+              <button type="button" className="submit-btn" onClick={handleSubmit} disabled={!input.trim()}>
+                Submit answer
               </button>
             </div>
+            <div className="input-hint">Structured answers score best — explain your approach, then the trade-offs.</div>
           </div>
         </footer>
       )}

@@ -7,20 +7,13 @@
   --text-medium: #666;
   --border-color: #e9e4e2;
   font-family: 'Satoshi', sans-serif;
-  background: #ffffff;
-  padding: 20px 30px;
+  background: transparent;
+  padding: 0;
   color: var(--navy);
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
-}
-
-.settings-page h2 {
-  font-family: 'Playfair Display', serif;
-  font-size: 1.5rem;
-  margin-bottom: 25px;
-  font-weight: 900;
 }
 
 .settings-page .settings-card {

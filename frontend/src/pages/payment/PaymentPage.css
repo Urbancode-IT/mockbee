@@ -18,6 +18,14 @@
   position: relative;
 }
 
+.payment-page--embedded {
+  min-height: 0;
+  background: transparent;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0;
+}
+
 .payment-page .payment-card {
   background: #fff;
   width: 100%;
@@ -35,7 +43,7 @@
 }
 
 .payment-page .checkout-header h1 {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Satoshi', sans-serif;
   font-size: 1.7rem;
   margin-bottom: 4px;
 }
@@ -348,7 +356,7 @@
 }
 
 .payment-page .upi-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Satoshi', sans-serif;
   font-size: 1.3rem;
   margin-bottom: 4px;
   text-align: center;
@@ -441,7 +449,7 @@
 }
 
 .payment-page .success-title {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Satoshi', sans-serif;
   margin-bottom: 10px;
 }
 

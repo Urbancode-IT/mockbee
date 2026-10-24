@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { KEYS, getItem, getJSON } from '../../utils/storage'
 import './SubscriptionPage.css'
@@ -14,7 +14,10 @@ function formatDate(iso) {
 
 export default function SubscriptionPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, setSubscription } = useAuth()
+  const fromBee = location.state?.fromBee
+  const beeRole = location.state?.role
 
   const isStudent = !!user?.isStudent || user?.role === 'STUDENT'
   const startDateStr = user?.subStartDate || getItem(KEYS.subStartDate)
@@ -152,8 +155,12 @@ export default function SubscriptionPage() {
 
   return (
     <div className="subscription-page">
+      {fromBee && !actualIsSubscribed && (
+        <div className="bee-upgrade-banner" role="status">
+          Free Bee practice complete{beeRole ? ` · ${beeRole}` : ''}. Subscribe to unlock full panel interviews.
+        </div>
+      )}
       <div className="plans-header">
-        <h1>Subscriptions</h1>
         <p>Manage your plan and unlock premium AI features directly from your workspace.</p>
         {datesInfo && (
           <div className="subscription-dates is-visible" style={{ color: '#FFFFFF' }}>

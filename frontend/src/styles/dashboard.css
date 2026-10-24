@@ -25,44 +25,84 @@ body {
   font-family: 'Satoshi', sans-serif;
   background-color: var(--cream-bg);
   color: var(--text-dark);
-  overflow: hidden;
-  /* Dashboard scroll controlled internally */
-  height: 100vh;
+}
+
+html.dashboard-mode,
+html.dashboard-mode body.dashboard-mode {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 0 !important;
+  align-items: unset !important;
+  justify-content: unset !important;
+  background-image: none;
+}
+
+body.dashboard-mode {
+  height: 100vh !important;
+  overflow: hidden !important;
 }
 
 .dashboard-layout {
   display: flex;
   height: 100vh;
   width: 100%;
+  overflow: hidden;
 }
 
-/* Sidebar Styling - Compact */
+/* Sidebar — collapsed by default, expands on hover */
 .sidebar {
-  width: 210px;
+  width: 75px;
   background-color: var(--navy);
   color: #FFFFFF;
   display: flex;
   flex-direction: column;
-  padding: 15px;
+  padding: 15px 10px;
   box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), padding 0.28s ease;
   z-index: 100;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sidebar:hover,
+.sidebar:focus-within {
+  width: 210px;
+  padding: 15px;
 }
 
 .sidebar-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   margin-bottom: 20px;
   padding: 0;
 }
 
+.sidebar:hover .sidebar-header,
+.sidebar:focus-within .sidebar-header {
+  justify-content: flex-start;
+}
+
 .side-logo {
-  width: 165px;
+  width: 45px;
   height: auto;
-  margin-left: -8px;
+  margin-left: 0;
   filter: drop-shadow(0 0 8px rgba(216, 196, 182, 0.3));
-  transition: all 0.3s ease;
+  transition: width 0.28s ease, margin 0.28s ease;
+}
+
+.sidebar:hover .side-logo,
+.sidebar:focus-within .side-logo {
+  width: 165px;
+  margin-left: -8px;
 }
 
 .brand-name {
@@ -73,73 +113,95 @@ body {
   transition: opacity 0.3s;
 }
 
-.sidebar-toggle-btn {
-  background: none;
-  border: none;
-  color: var(--gold);
-  cursor: pointer;
-  font-size: 1.1rem;
-  padding: 5px;
-  margin-left: auto;
-  transition: transform 0.3s;
-  display: flex;
+/* Hide labels while collapsed */
+.sidebar .brand-name,
+.sidebar .nav-item span,
+.sidebar .nav-section,
+.sidebar .user-text {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.18s ease, max-width 0.28s ease;
+}
+
+.sidebar .btn-logout {
+  display: none;
+}
+
+.sidebar .nav-section {
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar:hover .brand-name,
+.sidebar:hover .nav-item span,
+.sidebar:hover .nav-section,
+.sidebar:hover .user-text,
+.sidebar:focus-within .brand-name,
+.sidebar:focus-within .nav-item span,
+.sidebar:focus-within .nav-section,
+.sidebar:focus-within .user-text {
+  opacity: 1;
+  max-width: 180px;
+  pointer-events: auto;
+}
+
+.sidebar:hover .btn-logout,
+.sidebar:focus-within .btn-logout {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.sidebar-toggle-btn:hover {
-  color: #FFF;
-  transform: scale(1.1);
+.sidebar:hover .nav-section,
+.sidebar:focus-within .nav-section {
+  height: auto;
+  margin: 15px 5px 8px;
 }
 
-/* --- Collapsed State --- */
-.sidebar--collapsed {
-  width: 75px !important;
-  padding: 15px 10px !important;
-}
-
-.sidebar--collapsed .brand-name,
-.sidebar--collapsed .nav-item span,
-.sidebar--collapsed .nav-section,
-.sidebar--collapsed .user-text {
-  display: none !important;
-}
-
-.sidebar--collapsed .sidebar-header {
-  justify-content: center;
-  padding: 0;
-}
-
-.sidebar--collapsed .side-logo {
-  width: 45px;
-  margin-left: 0;
-}
-
-.sidebar--collapsed .sidebar-toggle-btn {
-  margin: 0;
-}
-
-.sidebar--collapsed .nav-item {
+.sidebar .nav-item {
   justify-content: center;
   padding: 12px 0;
 }
 
-.sidebar--collapsed .sidebar-footer {
+.sidebar:hover .nav-item,
+.sidebar:focus-within .nav-item {
+  justify-content: flex-start;
+  padding: 10px 14px;
+}
+
+.sidebar .sidebar-footer {
   justify-content: center;
   padding: 8px;
 }
 
-.sidebar--collapsed .avatar-mini {
+.sidebar:hover .sidebar-footer,
+.sidebar:focus-within .sidebar-footer {
+  justify-content: space-between;
+  padding: 10px 8px;
+}
+
+.sidebar .avatar-mini {
   margin-right: 0;
 }
 
-.sidebar--collapsed .btn-logout {
-  display: none;
+.sidebar:hover .avatar-mini,
+.sidebar:focus-within .avatar-mini {
+  margin-right: 0;
 }
 
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .nav-section {
@@ -170,8 +232,7 @@ body {
 }
 
 .dashboard-outlet {
-  width: 100%;
-  min-height: 100%;
+  /* full scroll styles defined with .content-viewport rules below */
 }
 
 .user-plan-mini.plan-pro { color: #F2C94C !important; font-weight: 800; background: transparent; }
@@ -297,6 +358,8 @@ body {
 /* Main Content Styling - Refined Spacing */
 .main-content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   background: var(--cream-bg);
   display: flex;
   flex-direction: column;
@@ -372,10 +435,9 @@ body {
 /* Content Area Styling - Compact Grid */
 .content-viewport {
   flex: 1;
+  min-height: 0; /* allow flex child to shrink so inner scroll works */
   padding: 0;
-  /* Remove padding here so iframe fills completely */
   overflow: hidden;
-  /* Prevent parent from scrolling */
   background-image: radial-gradient(circle at 100% 0%, rgba(216, 196, 182, 0.1) 0%, transparent 40%);
 }
 
@@ -384,7 +446,41 @@ body {
   height: 100%;
   overflow-y: auto;
   padding: 20px 30px;
-  /* Restore padding for inner content */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.active-content::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-outlet {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 28px 32px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dashboard-outlet::-webkit-scrollbar {
+  display: none;
+}
+
+/* Nested pages should not create a second full-page layout */
+.dashboard-outlet > * {
+  min-height: 0;
+}
+
+.dashboard-outlet .payment-page {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  align-items: flex-start;
 }
 
 .hidden {

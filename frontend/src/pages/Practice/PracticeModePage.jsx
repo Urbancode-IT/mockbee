@@ -124,9 +124,6 @@ export default function PracticeModePage({ mode: modeProp }) {
         <div className="pulse-ring" style={pulseStyle} />
       </div>
 
-      <h1 className="premium-title">{config.title}</h1>
-      <p className="premium-subtitle">{config.subtitle}</p>
-
       <div className="mode-stats" style={statsStyle}>
         {config.stats.map((s) => (
           <div className="stat-box" key={s.h}>

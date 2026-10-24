@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { KEYS, getJSON, setJSON, setItem } from '../../utils/storage'
 import './SettingsPage.css'
 
 export default function SettingsPage() {
-  const navigate = useNavigate()
   const { user, updateProfile } = useAuth()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -80,11 +78,6 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-page">
-      <button type="button" className="btn-back-settings" onClick={() => navigate('/dashboard')} aria-label="Back">
-        <i className="fas fa-arrow-left" />
-      </button>
-
-      <h2>Account Settings</h2>
       <div className="settings-card">
         <div className="form-group">
           <label htmlFor="settings-name">Full Name</label>

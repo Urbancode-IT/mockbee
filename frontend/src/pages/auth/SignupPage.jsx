@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
+import { useDialog } from '../../components/ui/DialogProvider'
 import '../../styles/signup.css'
 import './SignupPage.css'
 
@@ -9,6 +11,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/
 
 export default function SignupPage() {
   const { signup, oauthLogin } = useAuth()
+  const { prompt } = useDialog()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -75,18 +78,33 @@ export default function SignupPage() {
   }
 
   const handleOAuth = async (provider) => {
-    let oauthEmail = prompt(`Enter the email for your ${provider} account:`) || ''
-    oauthEmail = oauthEmail.trim().toLowerCase()
+    const emailRaw = await prompt(`Enter the email for your ${provider} account:`, {
+      title: `Continue with ${provider}`,
+      placeholder: 'you@example.com',
+      inputType: 'email',
+      confirmLabel: 'Next',
+    })
+    if (emailRaw === null) return
+
+    const oauthEmail = emailRaw.trim().toLowerCase()
     if (!oauthEmail || !oauthEmail.includes('@')) {
-      alert('A valid email is required to continue.')
+      toast.error('A valid email is required to continue.')
       return
     }
+
     const defaultName = oauthEmail.split('@')[0] || `${provider} User`
-    const oauthName = prompt(`Enter your ${provider} account name:`, defaultName) || defaultName
+    const nameRaw = await prompt(`Enter your ${provider} account name:`, {
+      title: `Continue with ${provider}`,
+      defaultValue: defaultName,
+      placeholder: 'Your name',
+      confirmLabel: 'Continue',
+    })
+    if (nameRaw === null) return
+    const oauthName = nameRaw.trim() || defaultName
 
     const result = await oauthLogin({ provider, email: oauthEmail, name: oauthName })
     if (!result.ok) {
-      alert(result.error || `Failed to continue with ${provider}.`)
+      toast.error(result.error || `Failed to continue with ${provider}.`)
       return
     }
     navigate('/dashboard')

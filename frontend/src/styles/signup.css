@@ -4,16 +4,17 @@
    ============================================ */
 
 .signup-section {
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     background-color: #E9E4E2;
     position: relative;
-    overflow: hidden;
-    padding: 10px 20px; /* Reduced vertical padding */
-    gap: 12px; /* Tightened from 30px */
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 70px 20px 24px;
+    gap: 12px;
 }
 
 /* ---- Welcome Minimal Styling (Synced) ---- */
@@ -107,16 +108,15 @@
     position: relative;
     z-index: 5;
     background: var(--white);
-    border-radius: 20px; /* Slightly smaller radius */
+    border-radius: 20px;
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05), 0 0 30px rgba(216, 196, 182, 0.15);
     width: 100%;
-    max-width: 880px; /* More compact width */
+    max-width: 880px;
     display: flex;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid rgba(216, 196, 182, 0.25);
     animation: fadeInUp 0.6s ease-out forwards;
     opacity: 0;
-    max-height: 92vh; /* More flexible height */
 }
 
 @keyframes fadeInUp {
@@ -127,8 +127,8 @@
 /* Left: Illustration Side */
 .signup-card__visual {
     flex: 1;
-    background: #FDFBFA; /* Lighter beige for cleaner look */
-    padding: 20px 30px; /* Reduced vertical from 40px */
+    background: #FDFBFA;
+    padding: 20px 30px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -136,6 +136,7 @@
     text-align: center;
     position: relative;
     overflow: hidden;
+    border-radius: 20px 0 0 20px;
 }
 
 .signup-card__visual::before {
@@ -182,11 +183,12 @@
 /* Right: Form Side */
 .signup-card__form-wrapper {
     flex: 1.3;
-    padding: 12px 35px 25px; /* Minimized top padding from 15px */
+    padding: 20px 32px 24px;
     background: var(--white);
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Ensure headers are at the top */
+    justify-content: flex-start;
+    border-radius: 0 20px 20px 0;
 }
 
 .form-header {
@@ -231,10 +233,11 @@
 .form-input {
     width: 100%;
     font-family: var(--font-body);
-    padding: 8px 16px; /* Further compacted from 9px */
+    height: 42px;
+    padding: 0 16px;
     border: 1.5px solid #F0ECEB;
     border-radius: 10px;
-    font-size: 0.85rem; /* Smaller from 0.9rem */
+    font-size: 0.9rem;
     color: var(--text-dark);
     transition: all 0.3s ease;
     background: #fdfcfb;
@@ -297,20 +300,20 @@
 }
 
 .form-link {
-    color: var(--gold-dark);
+    color: #1A1A1A;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.3s ease;
 }
 
 .form-link:hover {
-    color: #000000;
+    color: var(--gold-dark);
 }
 
 .btn-submit {
-    background: #000000;
+    background: #1A1A1A;
     color: #ffffff;
-    border: none;
+    border: 2px solid #1A1A1A;
     padding: 14px;
     border-radius: 10px;
     font-family: var(--font-heading);
@@ -318,14 +321,16 @@
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-top: 5px;
+    margin-top: 8px;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .btn-submit:hover {
-    background: var(--gold);
-    color: #000000;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(216, 196, 182, 0.4);
+    background: #E9E4E2;
+    color: #1A1A1A;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
 .auth-divider {
@@ -359,7 +364,8 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px; /* Reduced from 10px */
+    height: 42px;
+    padding: 0 12px;
     border: 1.5px solid #F0ECEB;
     background: var(--white);
     border-radius: 10px;
@@ -378,9 +384,11 @@
 
 .auth-redirect {
     text-align: center;
-    margin-top: 20px;
+    margin-top: 14px;
+    margin-bottom: 0;
     font-size: 0.9rem;
     color: var(--text-medium);
+    flex-shrink: 0;
 }
 
 @media (max-width: 900px) {
