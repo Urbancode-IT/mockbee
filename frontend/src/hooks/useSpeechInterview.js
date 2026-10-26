@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  speakNatural,
   stopNaturalSpeech,
   unlockSpeechAudio,
   warmSpeechVoices,
@@ -8,7 +9,7 @@ import { speakHuman, stopHumanVoice } from '../utils/humanVoice'
 
 /**
  * Speech (single voice) + STT helpers for enterprise interview rooms.
- * Human neural voice only via backend (/api/tts — Gemini or Edge).
+ * Prefer backend neural TTS (/api/tts); fall back to browser speechSynthesis.
  */
 export default function useSpeechInterview({ lang = 'en-IN' } = {}) {
   const [speaking, setSpeaking] = useState(false)
@@ -34,13 +35,21 @@ export default function useSpeechInterview({ lang = 'en-IN' } = {}) {
     async (text) => {
       if (mutedRef.current) return
       setSpeaking(true)
-      // 1) Human-like neural voice (Gemini TTS via backend)
-      // Human neural voice only (Gemini / Edge via /api/tts)
-      await speakHuman(text, {
+      const humanOk = await speakHuman(text, {
         muted: mutedRef.current,
         timeoutMs: 25000,
         onStart: () => setSpeaking(true),
       })
+      if (!humanOk && !mutedRef.current) {
+        await speakNatural(text, {
+          muted: mutedRef.current,
+          lang,
+          rate: 0.92,
+          pitch: 1.02,
+          volume: 1,
+          onStart: () => setSpeaking(true),
+        })
+      }
       setSpeaking(false)
     },
     [lang],
@@ -79,14 +88,25 @@ export default function useSpeechInterview({ lang = 'en-IN' } = {}) {
     await warmSpeechVoices()
     await unlockSpeechAudio(lang)
     setSpeaking(true)
-    const humanOk = await speakHuman(
-      'Hello. I am your AI interviewer. You should hear my voice clearly now.',
-      { muted: mutedRef.current, onStart: () => setSpeaking(true) },
-    )
+    const sample = 'Hello. I am your AI interviewer. You should hear my voice clearly now.'
+    const humanOk = await speakHuman(sample, {
+      muted: mutedRef.current,
+      onStart: () => setSpeaking(true),
+    })
+    if (!humanOk && !mutedRef.current) {
+      await speakNatural(sample, {
+        muted: mutedRef.current,
+        lang,
+        onStart: () => setSpeaking(true),
+      })
+    }
     setSpeaking(false)
     if (!humanOk) {
-      setError('Human voice is unavailable right now. You can still read captions and type answers.')
-      return false
+      // Browser fallback may still have worked; only warn if synthesis is missing.
+      if (!window.speechSynthesis) {
+        setError('Voice playback unavailable. You can still read captions and type answers.')
+        return false
+      }
     }
     return true
   }, [lang])

@@ -2303,8 +2303,9 @@ app.post('/api/enterprise/sessions/:sessionId/override', async (req, res) => {
 });
 
 // ── Start ────────────────────────────────────────────────────────────────────
-const PORT = 8001;
-const HOST = '127.0.0.1';
+// Linode / VPS: set HOST=127.0.0.1 behind nginx, or 0.0.0.0 if exposed directly.
+const PORT = Number(process.env.PORT) || 8001;
+const HOST = process.env.HOST || '127.0.0.1';
 
 app.listen(PORT, HOST, () => {
   console.log(`MockBee API listening on http://${HOST}:${PORT}`);

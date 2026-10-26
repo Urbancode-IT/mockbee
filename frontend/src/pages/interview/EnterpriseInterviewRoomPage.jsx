@@ -45,6 +45,26 @@ export default function EnterpriseInterviewRoomPage() {
 
   const mode = boot.current?.interview_mode || 'voice'
 
+  const {
+    speakText,
+    setMuted: setSpeechMuted,
+    startListening,
+    stopListening,
+    stopSpeaking,
+  } = speech
+
+  // Speak only — do not open the mic (used for intro).
+  const speakOnly = useCallback(
+    async (text) => {
+      if (paused || !text) return
+      setCaptions(text)
+      setStatus('speaking')
+      setSpeechMuted(muted)
+      await speakText(text)
+    },
+    [muted, paused, setSpeechMuted, speakText],
+  )
+
   // Single AI voice (new avatar video is silent): video moves only while
   // this voice speaks, then freezes while the candidate answers.
   const speakAndListen = useCallback(
@@ -52,21 +72,21 @@ export default function EnterpriseInterviewRoomPage() {
       if (paused) return
       setCaptions(text)
       setStatus('speaking')
-      speech.setMuted(muted)
-      await speech.speakText(text)
+      setSpeechMuted(muted)
+      await speakText(text)
       if (paused || mode === 'text') {
         setStatus('awaiting')
         return
       }
       setStatus('listening')
-      speech.startListening({
+      startListening({
         onFinal: (finalText) => {
           setAnswer((prev) => (prev ? `${prev} ${finalText}` : finalText))
           setStatus('awaiting')
         },
       })
     },
-    [mode, muted, paused, speech],
+    [mode, muted, paused, setSpeechMuted, speakText, startListening],
   )
 
   const beginInterviewAudio = useCallback(async () => {
@@ -75,19 +95,25 @@ export default function EnterpriseInterviewRoomPage() {
     setNeedsSoundTap(false)
 
     await unlockHumanVoice()
-    await avatarRef.current?.unlockSound?.()
+    // Interview uses AI TTS voice — keep video track muted (no double audio).
+    avatarRef.current?.muteVideo?.()
     await warmSpeechVoices()
     await unlockSpeechAudio('en-IN')
     setSoundOn(true)
     sessionStorage.setItem('mockbee_video_sound', '1')
     await new Promise((r) => setTimeout(r, 150))
 
-    const intro = boot.current?.intro
-    if (intro) await speakAndListen(intro)
-    if (boot.current?.first_question) {
+    const candidateName = (boot.current?.candidate_name || 'Candidate').trim()
+    const firstName = candidateName.split(/\s+/)[0] || candidateName
+    const intro =
+      boot.current?.intro ||
+      `Hello ${firstName}, welcome to your interview. I am your AI interviewer. Let's begin.`
+    // Intro: speak only — do not open mic before the first question.
+    await speakOnly(intro)
+    if (boot.current?.first_question?.question) {
       await speakAndListen(boot.current.first_question.question)
     }
-  }, [speakAndListen])
+  }, [speakAndListen, speakOnly])
 
   useEffect(() => {
     if (!boot.current?.session_id) {
@@ -96,16 +122,36 @@ export default function EnterpriseInterviewRoomPage() {
     }
   }, [interviewId, navigate])
 
+  // If invite page already unlocked audio, try auto-start; otherwise show tap button.
   useEffect(() => {
-    speech.setMuted(muted)
-  }, [muted, speech])
+    if (!boot.current?.session_id || introStartedRef.current) return
+    if (!boot.current?.audio_unlocked) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        await beginInterviewAudio()
+      } catch {
+        if (!cancelled) {
+          introStartedRef.current = false
+          setNeedsSoundTap(true)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [beginInterviewAudio])
+
+  useEffect(() => {
+    setSpeechMuted(muted)
+  }, [muted, setSpeechMuted])
 
   useEffect(
     () => () => {
-      speech.stopListening()
-      speech.stopSpeaking()
+      stopListening()
+      stopSpeaking()
     },
-    [speech],
+    [stopListening, stopSpeaking],
   )
 
   const completeInterview = useCallback(async () => {
@@ -247,9 +293,12 @@ export default function EnterpriseInterviewRoomPage() {
 
       {needsSoundTap && (
         <div className="panel-room__unlock">
-          <p>Browser blocked audio until you tap once.</p>
+          <p>
+            Tap once so I can welcome{' '}
+            <strong>{(boot.current?.candidate_name || 'you').trim()}</strong> and start the first question.
+          </p>
           <button type="button" className="panel-room__btn panel-room__btn--primary" onClick={beginInterviewAudio}>
-            Enable sound & start
+            Enable sound & start interview
           </button>
         </div>
       )}

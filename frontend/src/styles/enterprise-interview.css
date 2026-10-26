@@ -1016,7 +1016,8 @@
   pointer-events: none;
 }
 
-.mnc-invite__avatar .ai-interviewer-video.is-ready.is-speaking {
+.mnc-invite__avatar .ai-interviewer-video.is-ready.is-speaking,
+.mnc-invite__avatar .ai-interviewer-video.is-ready.is-playing {
   opacity: 1;
 }
 
@@ -1490,7 +1491,8 @@
   border-radius: 14px;
 }
 .panel-room__avatar .ai-interviewer-video { opacity: 0; pointer-events: none; }
-.panel-room__avatar .ai-interviewer-video.is-ready.is-speaking { opacity: 1; }
+.panel-room__avatar .ai-interviewer-video.is-ready.is-speaking,
+.panel-room__avatar .ai-interviewer-video.is-ready.is-playing { opacity: 1; }
 .panel-room__avatar .ai-interviewer-poster.is-covered { opacity: 0; }
 .panel-room__avatar .avatar-status-text {
   margin: 10px 0 0;

@@ -26,7 +26,7 @@ function speechStatus() {
     tts: {
       provider: ttsProvider,
       configured: ttsProvider === 'gemini' ? hasGemini : ttsProvider === 'browser' || Boolean(process.env.SPEECH_TTS_API_KEY),
-      voice: process.env.GEMINI_TTS_VOICE || 'Kore',
+      voice: process.env.GEMINI_TTS_VOICE || 'Aoede',
     },
     note: hasGemini
       ? 'Interviewer voice: human-like Gemini neural TTS (browser TTS is fallback only). STT runs in the browser.'

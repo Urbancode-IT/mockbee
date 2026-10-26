@@ -55,8 +55,9 @@ export default function EnterpriseInvitePage() {
       const network = speech.checkNetwork()
 
       await unlockHumanVoice()
-      await avatarRef.current?.unlockSound?.()
-      const audio = await speech.checkAudioPlayback()
+      // Play interviewer video once with original sound (enough for speaker check).
+      const videoOk = await avatarRef.current?.playWithSound?.()
+      const audio = Boolean(videoOk)
       if (audio) {
         setSoundOn(true)
         sessionStorage.setItem('mockbee_video_sound', '1')
@@ -64,7 +65,7 @@ export default function EnterpriseInvitePage() {
 
       setChecks({ mic, audio, network })
       if (audio) {
-        toast.success('System ready — interviewer voice enabled')
+        toast.success('System ready — video played once with sound')
       } else {
         toast.warning('Sound blocked. Allow audio for this tab and try again.')
       }
@@ -89,19 +90,25 @@ export default function EnterpriseInvitePage() {
     setStarting(true)
     try {
       speech.stopSpeaking()
+      avatarRef.current?.muteVideo?.()
+      const candidateName = name.trim()
       const { body, ok } = await apiFetch(`/api/enterprise/invite/${interviewId}/start`, {
         method: 'POST',
-        body: JSON.stringify({ candidate_name: name.trim(), candidate_email: email.trim() }),
+        body: JSON.stringify({ candidate_name: candidateName, candidate_email: email.trim() }),
       })
       if (!ok || body.status !== 'success') throw new Error(body.detail || 'Could not start interview')
+      const firstName = candidateName.split(/\s+/)[0] || candidateName
+      const intro =
+        body.intro ||
+        `Hello ${firstName}, welcome to your interview. I am your AI interviewer. Let's begin.`
       sessionStorage.setItem(
         `enterprise_session_${interviewId}`,
         JSON.stringify({
           session_id: body.session_id,
           submission_token: body.submission_token,
-          candidate_name: name.trim(),
+          candidate_name: candidateName,
           candidate_email: email.trim(),
-          intro: body.intro,
+          intro,
           first_question: body.first_question,
           duration_minutes: body.duration_minutes,
           interview_mode: body.interview_mode,
@@ -229,13 +236,11 @@ export default function EnterpriseInvitePage() {
             label="AI INTERVIEWER"
             showStatus
             statusText={
-              speech.speaking
-                ? 'Speaking…'
+              checking
+                ? 'Checking…'
                 : soundOn
-                  ? 'Voice ready'
-                  : checking
-                    ? 'Checking…'
-                    : 'Waiting for system check'
+                  ? 'Speaker ready'
+                  : 'Waiting for system check'
             }
           />
           <p className="mnc-invite__disclaimer">AI interviewer · not a live human</p>

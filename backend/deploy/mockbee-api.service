@@ -1,0 +1,19 @@
+[Unit]
+Description=MockBee API
+After=network.target mongod.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=mockbee
+Group=mockbee
+WorkingDirectory=/opt/mockbee/backend
+EnvironmentFile=/opt/mockbee/backend/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5
+# Soft limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -18,12 +18,13 @@ const TTS_MODELS = [
   'gemini-2.5-pro-preview-tts',
 ].filter(Boolean);
 
-const TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Kore';
-const EDGE_VOICE = process.env.EDGE_TTS_VOICE || 'en-US-AriaNeural';
+// Aoede / Neerja: clearer pronunciation than Kore / Aria for interview English.
+const TTS_VOICE = process.env.GEMINI_TTS_VOICE || 'Aoede';
+const EDGE_VOICE = process.env.EDGE_TTS_VOICE || 'en-IN-NeerjaNeural';
 
 const STYLE =
-  'Say in a warm, natural, friendly and professional female interviewer tone, ' +
-  'speaking calmly and clearly at a normal conversational pace: ';
+  'Speak in clear, natural Indian English with careful pronunciation. ' +
+  'Warm, professional female interviewer tone, calm pace, no rushed words: ';
 
 const cache = new Map();
 const CACHE_MAX = 60;
@@ -118,7 +119,7 @@ async function callGeminiTts(model, text) {
 async function callEdgeTts(text) {
   const tts = getEdgeClient();
   const result = await tts.generate(text, EDGE_VOICE, {
-    rate: '-8%',
+    rate: '-2%',
     pitch: '+0Hz',
     volume: '+0%',
   });
@@ -181,7 +182,7 @@ function ttsStatus() {
     voice: TTS_VOICE,
     edgeVoice: EDGE_VOICE,
     models: TTS_MODELS,
-    note: 'Human neural voice via Microsoft Edge Aria (primary), Gemini when available.',
+    note: 'Human neural voice via Microsoft Edge Neerja en-IN (primary), Gemini Aoede fallback.',
   };
 }
 

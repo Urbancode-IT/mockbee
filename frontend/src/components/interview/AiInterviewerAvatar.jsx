@@ -4,10 +4,9 @@ export const AI_INTERVIEWER_VIDEO = '/images/ai-interviewer.mp4'
 export const AI_INTERVIEWER_POSTER = '/images/ai-interviewer-poster.jpg'
 
 /**
- * Talking-head avatar — visuals only (always muted).
- * Speech comes from the AI voice (Gemini TTS / browser fallback), not the video track.
- * Label badge only renders when a `label` prop is passed (Excel/Company sidebars).
- * InterviewPage already shows status below the card, so no badge on the photo.
+ * Talking-head avatar.
+ * - System check: play video once with original audio, then stop.
+ * - Live interview: muted loop while TTS speaks.
  */
 const AiInterviewerAvatar = forwardRef(function AiInterviewerAvatar(
   {
@@ -24,81 +23,109 @@ const AiInterviewerAvatar = forwardRef(function AiInterviewerAvatar(
   ref,
 ) {
   const videoRef = useRef(null)
-  const unlockedRef = useRef(false)
+  const originalAudioRef = useRef(false)
   const [videoReady, setVideoReady] = useState(false)
   const [mediaFailed, setMediaFailed] = useState(false)
-  const shouldPlay = speaking
+  const [originalAudioOn, setOriginalAudioOn] = useState(false)
 
-  useImperativeHandle(ref, () => ({
-    async unlockSound() {
+  const isPlayingClip = originalAudioOn
+  const shouldPlay = speaking || isPlayingClip
+
+  useImperativeHandle(ref, () => {
+    const playWithSound = async () => {
       const video = videoRef.current
       if (!video) return false
       try {
-        video.muted = true
-        video.defaultMuted = true
-        video.currentTime = 0
+        originalAudioRef.current = true
+        setOriginalAudioOn(true)
+        video.loop = false
+        video.defaultMuted = false
+        video.muted = false
+        video.volume = 1
+        try {
+          video.currentTime = 0
+        } catch {
+          /* ignore */
+        }
         await video.play()
-        video.pause()
-        unlockedRef.current = true
         return true
       } catch (err) {
-        console.warn('Video prime failed', err)
+        console.warn('Video play with sound failed', err)
+        originalAudioRef.current = false
+        setOriginalAudioOn(false)
         return false
       }
-    },
-    playWithSound() {
+    }
+
+    const muteVideo = () => {
       const video = videoRef.current
       if (!video) return
+      originalAudioRef.current = false
+      setOriginalAudioOn(false)
       video.muted = true
+      video.volume = 0
+    }
+
+    return {
+      unlockSound: playWithSound,
+      playWithSound,
+      stopVoice() {
+        muteVideo()
+        videoRef.current?.pause()
+      },
+      setVideoMuted: muteVideo,
+      muteVideo,
+      getVideoEl: () => videoRef.current,
+    }
+  })
+
+  // One-shot clip ended → freeze on poster, sound off.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const onEnded = () => {
+      if (!originalAudioRef.current) return
+      originalAudioRef.current = false
+      setOriginalAudioOn(false)
+      video.muted = true
+      video.volume = 0
+      video.pause()
       try {
         video.currentTime = 0
       } catch {
         /* ignore */
       }
-      video.play().catch(() => {})
-    },
-    stopVoice() {
-      const video = videoRef.current
-      if (!video) return
-      video.muted = true
-      video.pause()
-    },
-    setVideoMuted() {
-      const video = videoRef.current
-      if (!video) return
-      video.muted = true
-    },
-    muteVideo() {
-      const video = videoRef.current
-      if (!video) return
-      video.muted = true
-    },
-    getVideoEl: () => videoRef.current,
-  }))
+    }
+    video.addEventListener('ended', onEnded)
+    return () => video.removeEventListener('ended', onEnded)
+  }, [])
 
   useEffect(() => {
     const video = videoRef.current
     if (!video || mediaFailed) return
 
     video.playsInline = true
+
+    if (originalAudioRef.current) {
+      // One-shot system-check clip with original audio.
+      video.loop = false
+      video.defaultMuted = false
+      video.muted = false
+      video.volume = 1
+      if (video.paused) video.play().catch(() => {})
+      return
+    }
+
+    // Live interview: muted lip-sync loop while TTS speaks.
     video.loop = true
-    video.muted = true
     video.defaultMuted = true
+    video.muted = true
     video.volume = 0
 
-    // Hard-mute on every tick — never let the video track add a second voice
-    const keepMuted = () => {
-      video.muted = true
-      video.defaultMuted = true
-      video.volume = 0
-    }
-    keepMuted()
-    video.addEventListener('play', keepMuted)
-    video.addEventListener('volumechange', keepMuted)
-
-    if (shouldPlay) {
+    if (speaking) {
       const play = () => {
-        keepMuted()
+        video.muted = true
+        video.volume = 0
         video.play().catch(() => {})
       }
       if (video.readyState >= 2) play()
@@ -106,23 +133,18 @@ const AiInterviewerAvatar = forwardRef(function AiInterviewerAvatar(
     } else {
       video.pause()
     }
-
-    return () => {
-      video.removeEventListener('play', keepMuted)
-      video.removeEventListener('volumechange', keepMuted)
-    }
-  }, [shouldPlay, soundEnabled, speaking, mediaFailed])
+  }, [shouldPlay, speaking, mediaFailed, originalAudioOn])
 
   return (
     <div
       className={`mascot-interviewer${speaking ? ' is-speaking' : ''}${
         listening ? ' is-listening' : ''
       }${preview ? ' is-preview' : ''}${full ? ' is-full' : ''}${
-        soundEnabled ? ' has-sound' : ''
+        soundEnabled || originalAudioOn ? ' has-sound' : ''
       }${className ? ` ${className}` : ''}`}
     >
       {label ? <span className="mascot-interviewer__label">{label}</span> : null}
-      <div className={`avatar-stage${speaking ? ' talking' : ''}${listening ? ' listening' : ''}`}>
+      <div className={`avatar-stage${speaking || isPlayingClip ? ' talking' : ''}${listening ? ' listening' : ''}`}>
         <div className="avatar-bounce-wrap">
           {!mediaFailed && (
             <img
@@ -139,14 +161,14 @@ const AiInterviewerAvatar = forwardRef(function AiInterviewerAvatar(
             <video
               ref={videoRef}
               className={`large-mascot ai-interviewer-video${speaking ? ' is-speaking' : ''}${
-                listening ? ' is-listening' : ''
-              }${full ? ' is-full' : ''}${videoReady ? ' is-ready' : ''}`}
+                isPlayingClip ? ' is-playing' : ''
+              }${listening ? ' is-listening' : ''}${full ? ' is-full' : ''}${
+                videoReady ? ' is-ready' : ''
+              }`}
               src={AI_INTERVIEWER_VIDEO}
               poster={AI_INTERVIEWER_POSTER}
               playsInline
-              loop
-              muted
-              preload="metadata"
+              preload="auto"
               controls={false}
               aria-label="AI Interviewer"
               onLoadedData={() => setVideoReady(true)}
