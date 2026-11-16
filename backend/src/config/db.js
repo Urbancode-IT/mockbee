@@ -7,12 +7,27 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.e
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 let client = null;
 
+function mongoTargetLabel() {
+  try {
+    return String(MONGO_URI).replace(/\/\/([^@/]+)@/, '//***@');
+  } catch {
+    return '(unset)';
+  }
+}
+
 async function getDb() {
   if (!client) {
-    client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 5000 });
+    // family: 4 avoids some Windows IPv6/Atlas TLS handshake failures
+    client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 8000, family: 4 });
     await client.connect();
   }
   return client.db('prepai');
+}
+
+async function pingMongo() {
+  const database = await getDb();
+  await database.command({ ping: 1 });
+  return { ok: true, target: mongoTargetLabel() };
 }
 
 async function col(name) {
@@ -53,4 +68,6 @@ module.exports = {
   now,
   upsertUser,
   getUser,
+  pingMongo,
+  mongoTargetLabel,
 };

@@ -46,6 +46,7 @@ html {
   scroll-behavior: smooth;
   width: 100%;
   max-width: 100%;
+  /* Keep html from scrolling so only body scrolls (one scrollbar) */
   height: 100%;
   overflow: hidden;
 }
@@ -60,6 +61,18 @@ body {
   max-width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: none;
+}
+
+/* Auth pages: never nest a second scrollbar inside the page shell */
+body:has(.signup-section),
+body:has(.login-section) {
+  overflow-y: auto;
+}
+
+body:has(.signup-section) .signup-section,
+body:has(.login-section) .login-section {
+  overflow: visible !important;
 }
 
 /* Dashboard owns its own viewport scroll — don't add a second browser scrollbar */

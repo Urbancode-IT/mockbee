@@ -4,14 +4,14 @@
    ============================================ */
 
 .login-section {
-    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column; /* Stacked layout */
     align-items: center;
     justify-content: center;
     background-color: #E9E4E2;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     padding: 60px 20px;
     gap: 35px; /* Space between welcome and card */
 }
@@ -19,11 +19,12 @@
 /* ---- Falling Blocks Animation ---- */
 .bg-bubbles {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
 }
 
 .bg-bubbles li {
@@ -60,14 +61,15 @@
 .bg-bubbles li:nth-child(20) { left: 95%; width: 90px; height: 90px; animation-delay: 17s; animation-duration: 45s; }
 
 .login-section {
-    height: 100vh;
+    min-height: 100dvh;
+    height: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     background-color: #E9E4E2;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     padding: 20px;
     gap: 30px; /* Space between text and card */
 }
@@ -421,3 +423,39 @@
 }
 
 /* Login page has no shared navbar — do not override .navbar globally */
+
+@media (max-width: 768px) {
+  .login-section {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    justify-content: flex-start;
+    padding: 72px 16px 28px;
+    gap: 18px;
+  }
+
+  .welcome-minimal__title {
+    font-size: 1.55rem;
+    color: #1a1a1a;
+  }
+
+  .welcome-minimal__subtitle {
+    font-size: 0.92rem;
+    padding: 0 8px;
+    max-width: 100%;
+  }
+
+  .login-card {
+    max-width: 100%;
+    padding: 22px 18px;
+    border-radius: 16px;
+  }
+
+  .login-card__title {
+    font-size: 1.45rem;
+  }
+
+  .login-section .btn-submit {
+    margin-top: 18px !important;
+  }
+}

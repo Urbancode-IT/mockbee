@@ -14,8 +14,25 @@ frontend/dist/
 *.log
 .DS_Store
 
+# Legacy Python (project is Node + React only)
+__pycache__/
+*.py
+*.py[cod]
+*.pyc
+.venv/
+venv/
+env/
+
 # Local temp / scratch (do not push)
 .tmp_*/
 .tmp_*
 **/.tmp_*
+*.tmp
+backend/scripts/_exports.txt
+backend/scripts/_ping.txt
 WhatsApp Video*
+/*.mp4
+
+# Local media / TTS test outputs
+backend/.tmp_*.mp3
+backend/*.mp3

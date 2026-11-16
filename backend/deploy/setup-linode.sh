@@ -40,17 +40,13 @@ systemctl daemon-reload
 systemctl enable mockbee-api
 systemctl restart mockbee-api
 
-echo "==> nginx reverse proxy"
-cp "$BACKEND/deploy/nginx-mockbee-api.conf" /etc/nginx/sites-available/mockbee-api
+echo "==> nginx reverse proxy (add mockbee-api only; do not remove other sites)"
+if [ ! -f /etc/nginx/sites-available/mockbee-api ]; then
+  cp "$BACKEND/deploy/nginx-mockbee-api.conf" /etc/nginx/sites-available/mockbee-api
+fi
 ln -sf /etc/nginx/sites-available/mockbee-api /etc/nginx/sites-enabled/mockbee-api
-rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
-
-echo "==> firewall (SSH + HTTP/HTTPS)"
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw --force enable || true
 
 echo ""
 echo "Done. Next:"
@@ -59,3 +55,5 @@ echo "  2. Point DNS A record → this Linode IP; edit server_name in nginx site
 echo "  3. sudo certbot --nginx -d api.yourdomain.com"
 echo "  4. Frontend: set VITE_API_BASE=https://api.yourdomain.com"
 echo "  5. systemctl status mockbee-api"
+echo ""
+echo "Shared-server tip: prefer deploy/setup-isolated.sh (home dir, no ufw/default-site changes)."

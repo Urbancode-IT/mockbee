@@ -172,117 +172,149 @@ export default function SignupPage() {
                 <span>or sign up with email</span>
               </div>
 
-              <form className="auth-form" onSubmit={handleSubmit} noValidate>
-                <div className="form-group">
-                  <label htmlFor="fullname" className="form-label">Full Name</label>
-                  <input
-                    type="text"
-                    id="fullname"
-                    name="fullname"
-                    className="form-input"
-                    placeholder="John Doe"
-                    value={fullname}
-                    onChange={(e) => {
-                      setFullname(e.target.value)
-                      clearError()
-                    }}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="email" className="form-label">Email Address</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    className="form-input"
-                    placeholder="john@example.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value)
-                      clearError()
-                    }}
-                    required
-                  />
-                </div>
-
-                <div className="form-group password-group">
-                  <label htmlFor="password" className="form-label">Password</label>
-                  <div className="input-wrapper">
+              <form className="auth-form signup-auth-form" onSubmit={handleSubmit} noValidate>
+                <div className="signup-fields">
+                  <div className="form-group">
+                    <label htmlFor="fullname" className="form-label">Full Name</label>
                     <input
-                      type={showPassword ? 'text' : 'password'}
-                      id="password"
-                      name="password"
+                      type="text"
+                      id="fullname"
+                      name="fullname"
                       className="form-input"
-                      placeholder="Create a strong password"
-                      value={password}
+                      placeholder="John Doe"
+                      value={fullname}
                       onChange={(e) => {
-                        setPassword(e.target.value)
+                        setFullname(e.target.value)
                         clearError()
                       }}
                       required
                     />
-                    <i
-                      className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} toggle-password`}
-                      onClick={() => setShowPassword((v) => !v)}
-                      role="button"
-                      tabIndex={0}
-                    />
                   </div>
-                </div>
 
-                <div className="form-group password-group">
-                  <label htmlFor="confirm-password" className="form-label">Re-enter Password</label>
-                  <div className="input-wrapper">
+                  <div className="form-group">
+                    <label htmlFor="email" className="form-label">Email Address</label>
                     <input
-                      type={showConfirm ? 'text' : 'password'}
-                      id="confirm-password"
-                      name="confirm-password"
+                      type="email"
+                      id="email"
+                      name="email"
                       className="form-input"
-                      placeholder="Confirm your password"
-                      value={confirm}
+                      placeholder="john@example.com"
+                      value={email}
                       onChange={(e) => {
-                        setConfirm(e.target.value)
+                        setEmail(e.target.value)
                         clearError()
                       }}
                       required
                     />
-                    <i
-                      className={`fas ${showConfirm ? 'fa-eye-slash' : 'fa-eye'} toggle-password`}
-                      onClick={() => setShowConfirm((v) => !v)}
-                      role="button"
-                      tabIndex={0}
-                    />
+                  </div>
+
+                  <div className="form-group password-group">
+                    <label htmlFor="password" className="form-label">Password</label>
+                    <div className="input-wrapper">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        id="password"
+                        name="password"
+                        className="form-input"
+                        placeholder="Create a strong password"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value)
+                          clearError()
+                        }}
+                        required
+                      />
+                      <i
+                        className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} toggle-password`}
+                        onClick={() => setShowPassword((v) => !v)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setShowPassword((v) => !v)
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group password-group">
+                    <label htmlFor="confirm-password" className="form-label">Re-enter Password</label>
+                    <div className="input-wrapper">
+                      <input
+                        type={showConfirm ? 'text' : 'password'}
+                        id="confirm-password"
+                        name="confirm-password"
+                        className="form-input"
+                        placeholder="Confirm your password"
+                        value={confirm}
+                        onChange={(e) => {
+                          setConfirm(e.target.value)
+                          clearError()
+                        }}
+                        required
+                      />
+                      <i
+                        className={`fas ${showConfirm ? 'fa-eye-slash' : 'fa-eye'} toggle-password`}
+                        onClick={() => setShowConfirm((v) => !v)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setShowConfirm((v) => !v)
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={`signup-error-msg${error ? ' is-visible' : ''}`}>
+                    <i className="fas fa-circle-exclamation" />
+                    <span>{error || 'All fields are required.'}</span>
                   </div>
                 </div>
 
-                <div className="form-options">
-                  <label className="checkbox-wrap">
-                    <input
-                      type="checkbox"
-                      id="agreeTerms"
-                      checked={agreeTerms}
-                      onChange={(e) => {
-                        setAgreeTerms(e.target.checked)
-                        clearError()
-                      }}
-                    />
-                    <span>
-                      I agree to the <a href="#" className="form-link">Terms</a> &{' '}
-                      <a href="#" className="form-link">Privacy</a>
-                    </span>
-                  </label>
-                </div>
+                <div className="signup-actions">
+                  <div className="form-options">
+                    <label className="checkbox-wrap">
+                      <input
+                        type="checkbox"
+                        id="agreeTerms"
+                        checked={agreeTerms}
+                        onChange={(e) => {
+                          setAgreeTerms(e.target.checked)
+                          clearError()
+                        }}
+                      />
+                      <span>
+                        I agree to the{' '}
+                        <a
+                          href="/membership"
+                          className="form-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Terms
+                        </a>{' '}
+                        &{' '}
+                        <a
+                          href="/membership"
+                          className="form-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Privacy
+                        </a>
+                      </span>
+                    </label>
+                  </div>
 
-                <div className={`signup-error-msg${error ? ' is-visible' : ''}`}>
-                  <i className="fas fa-circle-exclamation" />
-                  <span>{error || 'All fields are required.'}</span>
+                  <button type="submit" className="btn-submit" disabled={submitting}>
+                    {submitting ? 'Signing up…' : 'Sign Up'}
+                  </button>
                 </div>
-
-                <button type="submit" className="btn-submit" disabled={submitting}>
-                  {submitting ? 'Signing up…' : 'Sign Up'}
-                </button>
               </form>
 
               <p className="auth-redirect">

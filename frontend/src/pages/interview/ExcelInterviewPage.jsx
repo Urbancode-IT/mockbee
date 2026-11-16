@@ -5,7 +5,7 @@ import AiInterviewerAvatar from '../../components/interview/AiInterviewerAvatar'
 import { apiFetch } from '../../config/api'
 import { KEYS, getItem, getJSON, setItem, setJSON } from '../../utils/storage'
 import { speakNatural, stopNaturalSpeech, warmSpeechVoices } from '../../utils/naturalSpeech'
-import { speakHuman, stopHumanVoice } from '../../utils/humanVoice'
+import { speakHuman, stopHumanVoice, unlockHumanVoice } from '../../utils/humanVoice'
 import '../../styles/interview.css'
 
 function formatBold(text) {
@@ -125,6 +125,7 @@ export default function ExcelInterviewPage() {
       setLoading(true)
       setLoadError('')
       try {
+        await unlockHumanVoice()
         const { ok, body } = await apiFetch(`/api/excel-interview/${encodeURIComponent(bankId)}`)
         if (!ok) throw new Error(body.detail || 'Could not load questions')
 

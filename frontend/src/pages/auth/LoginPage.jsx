@@ -191,8 +191,12 @@ export default function LoginPage() {
                   onClick={() => setShowPassword((v) => !v)}
                   role="button"
                   tabIndex={0}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') setShowPassword((v) => !v)
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setShowPassword((v) => !v)
+                    }
                   }}
                 />
               </div>

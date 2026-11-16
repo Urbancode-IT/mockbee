@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE } from '../../config/api'
 import { useAuth } from '../../context/AuthContext'
 import { KEYS, getItem } from '../../utils/storage'
+import { unlockHumanVoice } from '../../utils/humanVoice'
 import '../../styles/excel-interview.css'
 
 export default function ExcelInterviewSetupPage() {
@@ -49,6 +50,7 @@ export default function ExcelInterviewSetupPage() {
     setUploading(true)
     setError('')
     try {
+      await unlockHumanVoice()
       const form = new FormData()
       form.append('file', file)
       form.append('title', title.trim() || 'Custom AI Interview')

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { API_BASE, apiFetch } from '../../config/api'
 import '../../styles/enterprise-interview.css'
@@ -73,6 +73,9 @@ export default function EnterpriseAdminPanel({
   const [roles, setRoles] = useState([])
   const [selectedBank, setSelectedBank] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [pendingFile, setPendingFile] = useState(null)
+  const [inlinePreview, setInlinePreview] = useState(false)
+  const fileInputRef = useRef(null)
   const [bankTitle, setBankTitle] = useState('Enterprise Question Bank')
   const [manualQs, setManualQs] = useState([emptyManualQuestion()])
   const [config, setConfig] = useState(EMPTY_CONFIG)
@@ -80,8 +83,16 @@ export default function EnterpriseAdminPanel({
   const [selectedBankId, setSelectedBankId] = useState('')
   const [saving, setSaving] = useState(false)
   const [providers, setProviders] = useState(null)
+  const [lastInviteUrl, setLastInviteUrl] = useState('')
 
   const qKey = useMemo(() => encodeURIComponent(adminKey || ''), [adminKey])
+
+  const inviteUrlFor = (path) => {
+    const p = path || ''
+    if (!p) return ''
+    if (p.startsWith('http')) return p
+    return `${window.location.origin}${p.startsWith('/') ? p : `/${p}`}`
+  }
 
   const loadLists = useCallback(async () => {
     if (!adminKey) return
@@ -115,38 +126,90 @@ export default function EnterpriseAdminPanel({
     setSubTab('bank-review')
   }
 
-  const uploadFile = async (file) => {
-    if (!file) return
+  const uploadFile = async (file, { openReview = true } = {}) => {
+    if (!file) return false
+    if (!adminKey) {
+      toast.error('Admin session expired. Please log in again.')
+      return false
+    }
     setUploading(true)
     try {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('title', bankTitle)
       fd.append('key', adminKey)
-      const res = await fetch(`${API_BASE}/api/enterprise/question-banks/upload`, {
+      const uploadUrl = `${API_BASE}/api/enterprise/question-banks/upload?key=${encodeURIComponent(adminKey)}`
+      const res = await fetch(uploadUrl, {
         method: 'POST',
+        headers: { 'x-admin-key': adminKey },
         body: fd,
       })
-      const body = await res.json()
-      if (!res.ok || body.status !== 'success') throw new Error(body.detail || 'Upload failed')
-      toast.success(`Extracted ${body.question_count} questions${body.ocr_used ? ' (OCR)' : ''}`)
-      setSelectedBank({
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 403) {
+        throw new Error('Unauthorized — admin session expired. Log out and log in again as admin.')
+      }
+      if (!res.ok || body.status !== 'success') {
+        throw new Error(body.detail || `Upload failed (${res.status})`)
+      }
+      const bank = {
         id: body.bank_id,
         _id: body.bank_id,
         title: body.title,
-        questions: body.questions,
+        questions: body.questions || [],
         status: 'pending_review',
         ocr_used: body.ocr_used,
         format: body.format,
-      })
-      setSubTab('bank-review')
+      }
+      toast.success(`Extracted ${body.question_count || bank.questions.length} questions${body.ocr_used ? ' (OCR)' : ''}`)
+      setSelectedBank(bank)
+      setPendingFile(null)
+      setInlinePreview(true)
+      // Stay on Questions tab so the list is visible under View (full editor via Edit & Approve).
+      if (openReview && !embedded) setSubTab('bank-review')
       loadLists()
       onRefresh?.()
+      return true
     } catch (e) {
       toast.error(String(e.message || e))
+      return false
     } finally {
       setUploading(false)
     }
+  }
+
+  const viewQuestions = async () => {
+    // Always prefer the live <input type="file"> value — React state can be lost on HMR.
+    const inputFile = fileInputRef.current?.files?.[0] || null
+    const file = inputFile || pendingFile
+
+    if (file) {
+      if (inputFile) setPendingFile(inputFile)
+      // Embedded admin: keep Questions tab + show list under View
+      await uploadFile(file, { openReview: !embedded })
+      return
+    }
+
+    if (selectedBank?.questions?.length) {
+      setInlinePreview(true)
+      if (!embedded) setSubTab('bank-review')
+      return
+    }
+
+    const first = banks[0]
+    if (first?.id) {
+      const { body, ok } = await apiFetch(`/api/enterprise/question-banks/${first.id}?key=${qKey}`)
+      if (!ok || body.status !== 'success') {
+        toast.error(body.detail || 'Could not load bank')
+        return
+      }
+      setSelectedBank(body.bank)
+      setInlinePreview(true)
+      if (!embedded) setSubTab('bank-review')
+      return
+    }
+
+    toast.error('Choose a file first, then click View')
+    fileInputRef.current?.click()
   }
 
   const saveManualBank = async () => {
@@ -217,7 +280,9 @@ export default function EnterpriseAdminPanel({
         })
         if (!ap.ok || ap.body.status !== 'success') throw new Error(ap.body.detail || 'Approve failed')
         setSelectedBank(ap.body.bank)
-        toast.success('Questions approved')
+        setSelectedBankId(String(id))
+        toast.success('Questions approved — next: Create & Link')
+        setSubTab('configure')
       } else {
         setSelectedBank(body.bank)
         toast.success('Question bank saved')
@@ -252,7 +317,7 @@ export default function EnterpriseAdminPanel({
         }),
       })
       if (!ok || body.status !== 'success') throw new Error(body.detail || 'Create failed')
-      toast.success('Interview created as draft')
+      toast.success('Draft created — Publish to get the interview link')
       setSubTab('interviews')
       loadLists()
       onRefresh?.()
@@ -272,7 +337,17 @@ export default function EnterpriseAdminPanel({
       toast.error(body.detail || 'Publish failed')
       return
     }
-    toast.success('Published — invite link ready')
+    const path = body.invite_url_path || body.interview?.invite_path || `/panel/${id}`
+    const url = inviteUrlFor(path)
+    setLastInviteUrl(url)
+    setSubTab('interviews')
+    toast.success('Published — interview link ready')
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copied')
+    } catch {
+      /* clipboard may be blocked; URL is shown on page */
+    }
     loadLists()
   }
 
@@ -302,12 +377,19 @@ export default function EnterpriseAdminPanel({
     loadLists()
   }
 
-  const copyInvite = (path) => {
-    const url = `${window.location.origin}${path}`
-    navigator.clipboard.writeText(url).then(
-      () => toast.success('Invite link copied'),
-      () => toast.message(url),
-    )
+  const copyInvite = async (path) => {
+    const url = inviteUrlFor(path)
+    if (!url) {
+      toast.error('No invite link available')
+      return
+    }
+    setLastInviteUrl(url)
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Interview link copied')
+    } catch {
+      toast.message(url)
+    }
   }
 
   const a = analytics || {}
@@ -414,17 +496,56 @@ export default function EnterpriseAdminPanel({
               Bank title
               <input value={bankTitle} onChange={(e) => setBankTitle(e.target.value)} />
             </label>
-            <div className="ent-inline" style={{ marginTop: 10 }}>
+            <div className="ent-inline" style={{ marginTop: 10, flexWrap: 'wrap' }}>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".xlsx,.xlsm,.csv,.pdf,.docx"
                 disabled={uploading}
-                onChange={(e) => uploadFile(e.target.files?.[0])}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  setPendingFile(file)
+                  setInlinePreview(false)
+                  if (file) toast.message(`${file.name} ready — click View`)
+                }}
               />
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={uploading}
+                onClick={viewQuestions}
+              >
+                {uploading ? 'Uploading…' : 'View'}
+              </button>
               <a className="btn-secondary" href={`${API_BASE}/api/enterprise/question-banks/template`}>
                 Download template
               </a>
             </div>
+            {pendingFile && (
+              <p className="muted" style={{ marginTop: 8 }}>
+                Selected: <strong>{pendingFile.name}</strong>
+              </p>
+            )}
+            {inlinePreview && selectedBank?.questions?.length > 0 && subTab === 'banks' && (
+              <div className="bank-inline-preview">
+                <div className="ent-inline" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
+                  <strong>
+                    {selectedBank.title} · {selectedBank.questions.length} questions
+                  </strong>
+                  <button type="button" className="btn-primary" onClick={() => setSubTab('bank-review')}>
+                    Edit &amp; Approve
+                  </button>
+                </div>
+                <ol className="bank-inline-preview__list">
+                  {selectedBank.questions.slice(0, 20).map((q, i) => (
+                    <li key={q.id || i}>{q.question || '(empty question)'}</li>
+                  ))}
+                </ol>
+                {selectedBank.questions.length > 20 && (
+                  <p className="muted">Showing first 20. Open Edit &amp; Approve for full list.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="enterprise-panel" style={{ margin: 0 }}>
@@ -482,13 +603,24 @@ export default function EnterpriseAdminPanel({
 
           <div className="enterprise-panel" style={{ margin: 0 }}>
             <h3>Existing banks</h3>
+            {selectedBank && (
+              <div className="invite-link-card" style={{ marginBottom: 12 }}>
+                <div>
+                  <p className="invite-link-card__label">In review</p>
+                  <strong>{selectedBank.title || 'Question bank'}</strong>
+                </div>
+                <button type="button" className="btn-primary" onClick={() => setSubTab('bank-review')}>
+                  Continue review
+                </button>
+              </div>
+            )}
             {banks.map((b) => (
               <div className="cat-row" key={b.id}>
                 <span>
                   {b.title} · {b.question_count} Q · {b.status}
                 </span>
                 <button type="button" className="btn-secondary" onClick={() => openBank(b.id)}>
-                  Open
+                  View
                 </button>
               </div>
             ))}
@@ -503,7 +635,10 @@ export default function EnterpriseAdminPanel({
             <div className="bank-review__empty">
               <i className="fas fa-clipboard-list" />
               <h3>No bank selected</h3>
-              <p>Upload a bank or open one from Question Banks to review and edit questions here.</p>
+              <p>Upload a bank or open one from Questions to review and edit here.</p>
+              <button type="button" className="btn-primary" onClick={() => setSubTab('banks')}>
+                Back to Questions
+              </button>
             </div>
           ) : (
             <>
@@ -630,8 +765,8 @@ export default function EnterpriseAdminPanel({
         <div className="panel-config">
           <header className="panel-config__hero">
             <div>
-              <h3>Configure interview panel</h3>
-              <p>Pick an approved bank, set role &amp; rules, then create a draft. Publish it from Interview Panels.</p>
+              <h3>Create &amp; Link</h3>
+              <p>Pick an approved bank, set role &amp; rules, create a draft, then Publish from Panels to get the interview link.</p>
             </div>
           </header>
 
@@ -646,12 +781,17 @@ export default function EnterpriseAdminPanel({
                 <span>Question bank</span>
                 <select value={selectedBankId} onChange={(e) => setSelectedBankId(e.target.value)}>
                   <option value="">Select approved bank…</option>
-                  {banks.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.title} · {b.status} · {b.question_count}Q
-                    </option>
-                  ))}
+                  {banks
+                    .filter((b) => String(b.status || '').toLowerCase() === 'approved')
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.title} · {b.question_count}Q
+                      </option>
+                    ))}
                 </select>
+                {!banks.some((b) => String(b.status || '').toLowerCase() === 'approved') && (
+                  <span className="panel-config__hint">No approved banks yet. Approve questions first.</span>
+                )}
               </label>
             </div>
           </section>
@@ -825,40 +965,68 @@ export default function EnterpriseAdminPanel({
 
       {subTab === 'interviews' && (
         <div className="ent-wizard">
-          {interviews.map((iv) => (
-            <div className="ent-q-item" key={iv.id}>
-              <div className="ent-inline" style={{ justifyContent: 'space-between' }}>
-                <div>
-                  <strong>{iv.title}</strong>
-                  <div className="muted">
-                    {iv.config?.job_role} · {iv.status} · pass {iv.config?.passing_score}%
+          {lastInviteUrl && (
+            <div className="invite-link-card">
+              <div>
+                <p className="invite-link-card__label">Interview link</p>
+                <a className="invite-link-card__url" href={lastInviteUrl} target="_blank" rel="noreferrer">
+                  {lastInviteUrl}
+                </a>
+              </div>
+              <button type="button" className="btn-primary" onClick={() => copyInvite(lastInviteUrl)}>
+                Copy link
+              </button>
+            </div>
+          )}
+
+          {interviews.map((iv) => {
+            const path = iv.invite_path || `/panel/${iv.id}`
+            const url = inviteUrlFor(path)
+            return (
+              <div className="ent-q-item" key={iv.id}>
+                <div className="ent-inline" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <strong>{iv.title}</strong>
+                    <div className="muted">
+                      {iv.config?.job_role} · {iv.status} · pass {iv.config?.passing_score}%
+                    </div>
+                    {iv.status === 'published' && (
+                      <div className="invite-link-row">
+                        <span className="invite-link-row__label">Link:</span>
+                        <a href={url} target="_blank" rel="noreferrer" className="invite-link-row__url">
+                          {url}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ent-inline" style={{ flexShrink: 0 }}>
+                    {iv.status === 'published' && (
+                      <button type="button" className="btn-primary" onClick={() => copyInvite(path)}>
+                        Copy link
+                      </button>
+                    )}
+                    {iv.status !== 'published' && iv.status !== 'archived' && (
+                      <button type="button" className="btn-primary" onClick={() => publishInterview(iv.id)}>
+                        Publish
+                      </button>
+                    )}
+                    <button type="button" className="btn-secondary" onClick={() => duplicateInterview(iv.id)}>
+                      Duplicate
+                    </button>
+                    {iv.status !== 'archived' && (
+                      <button type="button" className="btn-secondary" onClick={() => archiveInterview(iv.id)}>
+                        Archive
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="ent-inline">
-                  {iv.status === 'published' && (
-                    <button type="button" className="btn-primary" onClick={() => copyInvite(iv.invite_path)}>
-                      Copy invite
-                    </button>
-                  )}
-                  {iv.status !== 'published' && iv.status !== 'archived' && (
-                    <button type="button" className="btn-primary" onClick={() => publishInterview(iv.id)}>
-                      Publish
-                    </button>
-                  )}
-                  <button type="button" className="btn-secondary" onClick={() => duplicateInterview(iv.id)}>
-                    Duplicate
-                  </button>
-                  {iv.status !== 'archived' && (
-                    <button type="button" className="btn-secondary" onClick={() => archiveInterview(iv.id)}>
-                      Archive
-                    </button>
-                  )}
-                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
           {!interviews.length && (
-            <p className="muted">No interview panels yet. Upload questions → Configure Panel → Publish. That invite is the live panel.</p>
+            <p className="muted">
+              No interview panels yet. Simple flow: Questions → Approve → Configure → Publish → copy the link.
+            </p>
           )}
         </div>
       )}

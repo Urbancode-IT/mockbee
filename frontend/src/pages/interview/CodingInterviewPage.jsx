@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import AiInterviewerAvatar from '../../components/interview/AiInterviewerAvatar'
 import { apiFetch } from '../../config/api'
 import { speakNatural, stopNaturalSpeech, warmSpeechVoices } from '../../utils/naturalSpeech'
-import { speakHuman, stopHumanVoice } from '../../utils/humanVoice'
+import { speakHuman, stopHumanVoice, unlockHumanVoice } from '../../utils/humanVoice'
 import '../../styles/coding-interview.css'
 import '../../styles/interview.css'
 
@@ -330,6 +330,8 @@ export default function CodingInterviewPage() {
     startedRef.current = true
     ;(async () => {
       try {
+        await unlockHumanVoice()
+        await warmSpeechVoices()
         const { ok, body, status } = await apiFetch(`/api/coding-interview/bank/${encodeURIComponent(bankId)}`)
         if (!ok) {
           if (status === 410 || /expired|already completed/i.test(String(body?.detail || ''))) {

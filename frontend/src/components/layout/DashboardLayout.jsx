@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
@@ -88,6 +88,7 @@ export default function DashboardLayout() {
   const { user, displayName, logout, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [navOpen, setNavOpen] = useState(false)
   const plan = useMemo(() => planLabel(user), [user])
   const isOverview = location.pathname === '/dashboard' || location.pathname === '/dashboard/'
   const pageMeta = resolvePageMeta(location.pathname)
@@ -95,6 +96,10 @@ export default function DashboardLayout() {
   useEffect(() => {
     if (!isAuthenticated) navigate('/login', { replace: true })
   }, [isAuthenticated, navigate])
+
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     document.documentElement.classList.add('dashboard-mode')
@@ -137,8 +142,14 @@ export default function DashboardLayout() {
   if (!isAuthenticated) return null
 
   return (
-    <div className="dashboard-layout">
-      <aside className="sidebar" aria-label="Dashboard navigation">
+    <div className={`dashboard-layout${navOpen ? ' nav-open' : ''}`}>
+      <button
+        type="button"
+        className="dash-nav-backdrop"
+        aria-label="Close menu"
+        onClick={() => setNavOpen(false)}
+      />
+      <aside className={`sidebar${navOpen ? ' is-open' : ''}`} aria-label="Dashboard navigation">
         <div className="sidebar-header">
           <img
             src={LOGO}
@@ -147,6 +158,14 @@ export default function DashboardLayout() {
             onClick={() => navigate('/')}
             style={{ cursor: 'pointer' }}
           />
+          <button
+            type="button"
+            className="dash-nav-close"
+            aria-label="Close menu"
+            onClick={() => setNavOpen(false)}
+          >
+            <i className="fas fa-times" />
+          </button>
         </div>
 
         <nav className="sidebar-nav">
@@ -161,6 +180,7 @@ export default function DashboardLayout() {
                       end={item.end}
                       className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
                       title={item.label}
+                      onClick={() => setNavOpen(false)}
                     >
                       <i className={`fas ${item.icon}`} /> <span>{item.label}</span>
                     </NavLink>
@@ -187,6 +207,15 @@ export default function DashboardLayout() {
 
       <main className="main-content">
         <header className="dashboard-header">
+          <button
+            type="button"
+            className="dash-nav-toggle"
+            aria-label="Open menu"
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen(true)}
+          >
+            <i className="fas fa-bars" />
+          </button>
           <div className="welcome-text">
             {isOverview || !pageMeta ? (
               <>

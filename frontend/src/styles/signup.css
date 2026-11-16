@@ -4,17 +4,18 @@
    ============================================ */
 
 .signup-section {
-    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     background-color: #E9E4E2;
     position: relative;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 70px 20px 24px;
-    gap: 12px;
+    /* Body is the only scroller — nested overflow causes double scrollbar */
+    overflow: visible;
+    padding: 64px 16px 28px;
+    gap: 10px;
+    box-sizing: border-box;
 }
 
 /* ---- Welcome Minimal Styling (Synced) ---- */
@@ -27,21 +28,21 @@
 
 .welcome-minimal__title {
     font-family: var(--font-heading);
-    font-size: 2rem; /* Reduced from 2.4rem */
+    font-size: clamp(1.35rem, 2.4vw, 1.75rem);
     font-weight: 900;
     color: #1A1A1A;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     letter-spacing: -0.5px;
 }
 
 .welcome-minimal__subtitle {
     font-family: var(--font-body);
-    font-size: 0.95rem; /* Reduced from 1.1rem */
+    font-size: 0.88rem;
     color: #666;
     max-width: 480px;
     margin: 0 auto;
     padding-left: 0;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 @keyframes fadeInDown {
@@ -52,11 +53,12 @@
 /* ---- Falling Blocks Animation (Synced with Login) ---- */
 .bg-bubbles {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
 }
 
 .bg-bubbles li {
@@ -214,13 +216,13 @@
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 8px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 4px; /* Tighter gap from 8px */
+    gap: 3px;
 }
 
 .form-label {
@@ -233,11 +235,11 @@
 .form-input {
     width: 100%;
     font-family: var(--font-body);
-    height: 42px;
-    padding: 0 16px;
+    height: 38px;
+    padding: 0 14px;
     border: 1.5px solid #F0ECEB;
     border-radius: 10px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     color: var(--text-dark);
     transition: all 0.3s ease;
     background: #fdfcfb;
@@ -406,12 +408,24 @@
 }
 
 @media (max-width: 600px) {
+    .signup-section {
+        padding: 72px 16px 28px;
+        justify-content: flex-start;
+        overflow: visible;
+    }
+
+    .signup-card {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 16px;
+    }
+
     .signup-card__form-wrapper {
-        padding: 40px 20px;
+        padding: 28px 16px;
     }
 
     .form-header__title {
-        font-size: 2rem;
+        font-size: 1.6rem;
     }
 
     .social-login {

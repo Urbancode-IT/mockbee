@@ -596,10 +596,15 @@
 .bank-review__list {
   display: grid;
   gap: 14px;
-  max-height: min(58vh, 640px);
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
   padding: 2px 2px 8px;
-  scrollbar-width: thin;
+}
+
+.admin-dashboard-page.embedded .bank-review__list,
+.admin-embedded-module .bank-review__list {
+  max-height: none;
+  overflow: visible;
 }
 
 .bank-q-card {
@@ -783,6 +788,34 @@
   .bank-btn {
     flex: 1;
     text-align: center;
+  }
+
+  .two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ent-inline {
+    flex-wrap: wrap;
+  }
+
+  .panel-config__hero {
+    flex-direction: column;
+  }
+
+  .panel-config__steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ent-q-item .ent-inline {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .ent-q-item .btn-primary,
+  .ent-q-item .btn-secondary {
+    width: 100%;
   }
 }
 

@@ -89,9 +89,10 @@ export default function AdminDashboardPage({ embedded = false }) {
     }
     if (!adminKey) {
       toast.error('Admin session expired. Please log in again.')
-      navigate(embedded ? '/dashboard' : '/login', { replace: true })
+      logout?.()
+      navigate('/login', { replace: true })
     }
-  }, [adminKey, embedded, navigate, user?.isAdmin])
+  }, [adminKey, embedded, logout, navigate, user?.isAdmin])
 
   const loadData = useCallback(async () => {
     if (!adminKey) return
@@ -99,7 +100,13 @@ export default function AdminDashboardPage({ embedded = false }) {
     setSessionsLoading(true)
 
     try {
-      const { body } = await apiFetch(`/api/admin/users?key=${encodeURIComponent(adminKey)}`)
+      const { body, status, ok } = await apiFetch(`/api/admin/users?key=${encodeURIComponent(adminKey)}`)
+      if (status === 403 || (!ok && /unauthor/i.test(String(body.detail || '')))) {
+        toast.error('Admin session expired. Please log in again.')
+        logout?.()
+        navigate('/login', { replace: true })
+        return
+      }
       if (body.status === 'success') setAllUsers(body.users || [])
     } catch {
       setAllUsers([])
@@ -122,7 +129,7 @@ export default function AdminDashboardPage({ embedded = false }) {
     } catch {
       setAnalytics(null)
     }
-  }, [adminKey])
+  }, [adminKey, logout, navigate])
 
   useEffect(() => {
     loadData()
@@ -344,29 +351,31 @@ export default function AdminDashboardPage({ embedded = false }) {
         </div>
       </div>
 
-      {/* Single unified admin module — one tab bar for everything */}
       <div className="admin-tab-bar" role="tablist" aria-label="Admin modules">
         {[
           ['overview', 'fa-chart-pie', 'Overview'],
-          ['banks', 'fa-database', 'Question Banks'],
-          ['review', 'fa-list-check', 'Review'],
-          ['configure', 'fa-sliders', 'Configure Panel'],
-          ['interviews', 'fa-building', 'Interview Panels'],
+          ['banks', 'fa-database', 'Questions'],
+          ['configure', 'fa-link', 'Create & Link'],
+          ['interviews', 'fa-building', 'Panels'],
           ['users', 'fa-users', 'Users'],
-          ['sessions', 'fa-history', 'Sessions & Reports'],
+          ['sessions', 'fa-history', 'Reports'],
         ].map(([key, icon, label]) => (
           <button
             key={key}
             type="button"
             role="tab"
-            aria-selected={tab === key}
-            className={`admin-tab-btn${tab === key ? ' active' : ''}`}
+            aria-selected={tab === key || (key === 'banks' && tab === 'review')}
+            className={`admin-tab-btn${tab === key || (key === 'banks' && tab === 'review') ? ' active' : ''}`}
             onClick={() => setTab(key)}
           >
             <i className={`fas ${icon}`} style={{ marginRight: 6 }} /> {label}
           </button>
         ))}
       </div>
+      <p className="admin-flow-hint">
+        Simple flow: <strong>Questions</strong> → approve → <strong>Create &amp; Link</strong> → Publish → copy interview link from{' '}
+        <strong>Panels</strong>.
+      </p>
 
       <main className="admin-content">
       {['overview', 'banks', 'review', 'configure', 'interviews'].includes(tab) && (

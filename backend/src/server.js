@@ -2312,5 +2312,11 @@ app.listen(PORT, HOST, () => {
   if (providers.DEMO_MODE) {
     console.log('⚠ DEMO MODE: GEMINI_API_KEY not set — evaluation uses heuristic scoring.');
   }
+  db.pingMongo()
+    .then((info) => console.log(`MongoDB connected: ${info.target}`))
+    .catch((err) => {
+      console.error(`⚠ MongoDB unreachable (${db.mongoTargetLabel()}): ${String(err.message || err).split('\n')[0]}`);
+      console.error('  Auth, admin, and enterprise flows need Mongo. Fix MONGO_URI / Atlas Network Access, or use mongodb://127.0.0.1:27017 for local.');
+    });
 });
 

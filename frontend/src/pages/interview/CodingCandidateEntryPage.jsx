@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../../config/api'
+import { unlockHumanVoice } from '../../utils/humanVoice'
 import '../../styles/excel-interview.css'
 import '../../styles/coding-interview.css'
 
@@ -47,6 +48,7 @@ export default function CodingCandidateEntryPage() {
     setStarting(true)
     setError('')
     try {
+      await unlockHumanVoice()
       if (navigator.mediaDevices?.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         stream.getTracks().forEach((t) => t.stop())
